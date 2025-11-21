@@ -1,0 +1,19 @@
+{
+  "name": "codebattle",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "frontend": "cd client && npm run dev",
+    "backend": "cd server && nodemon server.js",
+    "dev": "concurrently \"npm run frontend \" cd .. \"npm run backend\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "nodemon": "^3.1.10"
+  }
+}
