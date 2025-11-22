@@ -3,6 +3,7 @@ import cors from 'cors'
 import { Server } from 'socket.io'
 import http from 'http';
 import RoomRoutes from './routes/RoomRoute.js';
+
 // Constants
 const PORT = process.env.PORT || 4000;
 
@@ -24,7 +25,7 @@ app.get("/", (req, res) => {
     res.send("Backend OK ✅");
 });
 
-app.use('/api/room', RoomRoutes)
+app.use('/api/rooms', RoomRoutes)
 //Socket.io
 io.on("connection", (socket) => {
     console.log("🔌 New client connected:", socket.id);

@@ -1,7 +1,7 @@
 import Router from 'express'
+import { createRoom, joinRoom } from '../controllers/RoomControls.js'
 const RoomRoutes = Router()
 
-RoomRoutes.get('/create-room', (req, res) => {
-    res.send({message: "Room Generated"})
-})
+RoomRoutes.post('/create-room', createRoom)
+RoomRoutes.post('/join-room', joinRoom)
 export default RoomRoutes

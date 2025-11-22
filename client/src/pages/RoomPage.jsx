@@ -20,25 +20,15 @@ import { Button } from "../../components/ui/button";
 import { ArrowLeft, Check, Copy } from "lucide-react";
 import { motion } from 'motion/react'
 import { useNavigate } from "react-router-dom";
-import { io } from 'socket.io-client'
 import { socket } from "../lib/socket";
 import { useEffect } from "react";
 import toast from 'react-hot-toast';
-
+import { useAuth } from '../lib/AuthProvider'
 const RoomPage = () => {
   const navigate = useNavigate()
-  const [roomCode, setRoomCode] = useState('')
   const [isCopied, setIsCopied] = useState(false);
-  function makeRoomCode(length = 6) {
-    const chars = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // avoid ambiguous chars
-    let code = ""
-    for (let i = 0; i < length; i++) {
-      code += chars[Math.floor(Math.random() * chars.length)];
-    }
-    setRoomCode(code)
-    return code
-  }
-
+  const { currentUser, userData } = useAuth()
+  const [roomCode, setRoomCode] = useState('')
   // Inputs From Code
   const [inpJoinCode, setInpJoinCode] = useState('')
   const [inpCreateRoomName, setInpCreateRoomName] = useState('')
@@ -58,18 +48,30 @@ const RoomPage = () => {
   const createRoom = (code) => {
     socket.emit("create-room", code)
   }
-  const handleCreate = () => {
-    let code = "";
-    if (roomCode == "") {
-      code = makeRoomCode()
-    } else {
-      toast.error("You Already Made a room")
-      return
+  const handleCreate = async () => {
+    const body = {
+      roomName: inpCreateRoomName,
+      mode: 'dsa',
+      difdifficulty: 'easy',
+      user: {
+        uid: currentUser.uid,
+        name: userData?.displayName,
+        avatarUrl: currentUser.photoURL
+      },
     }
-    createRoom(code)
-    setTimeout(() => {
-      navigate(`/room/${code}`)
-    }, 1000);
+    const res = await fetch("http://localhost:4000/api/rooms/create-room", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    })
+
+    const data = await res.json();
+    setRoomCode(data?.room?.code)
+    if (data.ok) {
+      navigate(`/room/${data.room.code}`);
+    } else {
+      toast.error(data.message || "Failed to create room");
+    }
   }
 
 
@@ -206,7 +208,7 @@ const RoomPage = () => {
                   <div className="space-y-5">
                     <div className="space-y-3">
                       <Label>Room Code</Label>
-                      <Input id="roomcode" placeholder="Enter Room Code"  onChange={(e) => setInpJoinCode(e.target.value.toUpperCase())}/>
+                      <Input id="roomcode" placeholder="Enter Room Code" onChange={(e) => setInpJoinCode(e.target.value.toUpperCase())} />
                     </div>
                   </div>
                 </CardContent>

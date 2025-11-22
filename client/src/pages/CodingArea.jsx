@@ -31,17 +31,37 @@ import { dataset } from '../data/problems';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '../../components/ui/carousel'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
+import { useNavigate, useParams } from 'react-router-dom';
+import { rtdb } from '../../firebase'
+import { get, ref } from 'firebase/database'
+import toast from 'react-hot-toast'
 
 
 const CodingArea = () => {
-
+    const navigate = useNavigate()
     const languages = [
         { value: 'javascript', label: 'JavaScript' },
         { value: 'python', label: 'Python' },
         { value: 'java', label: 'Java' },
         { value: 'cpp', label: 'C++' },
     ];
-    const code = window.location.pathname.split('/')[window.location.pathname.split('/').length - 1]
+
+    const { code } = useParams()
+
+    useEffect(() => {
+        checkCodeExists()
+    }, [])
+
+    const roomRef = ref(rtdb, `rooms/${code}`)
+    const checkCodeExists = async () => {
+        const snapshot = await get(roomRef);
+        if (!snapshot.exists()) {
+            toast.error("There's No Room Of this Code")
+            navigate(`/room`)
+            return
+        }
+    }
+
     const [selectedLanguage, setSelectedLanguage] = useState('javascript');
     const prob = dataset[0]
     const [editorCode, setEditorCode] = useState(
@@ -113,7 +133,7 @@ const CodingArea = () => {
                                     <div className='p-2'>
                                         <h1 className='text-md italic font-semibold text-lg '>Constraints</h1>
                                         {prob.constraints.map((c) => (
-                                            <p className='my-1'>{c}</p>
+                                            <p key={c} className='my-1'>{c}</p>
                                         ))}
                                     </div>
                                 </div>
