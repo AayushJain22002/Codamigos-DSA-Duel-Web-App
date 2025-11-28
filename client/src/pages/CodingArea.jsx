@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import {
     ResizableHandle,
     ResizablePanel,
@@ -15,7 +15,7 @@ import {
 import { Button } from '../../components/ui/button'
 import { BsChatRightTextFill } from "react-icons/bs";
 import { Input } from '../../components/ui/input'
-import { DoorOpen, Link, RotateCcw, Send, Terminal, Play, Loader2, PlayCircle, Lock } from 'lucide-react';
+import { DoorOpen, Link, RotateCcw, Send, Terminal, Play, Loader2, PlayCircle, Lock, ListTodo } from 'lucide-react';
 import {
     Tooltip,
     TooltipContent,
@@ -48,7 +48,7 @@ const CodingArea = () => {
     const navigate = useNavigate()
     const { code } = useParams()
     const { currentUser, userData } = useAuth()
-    
+
     // --- State Management ---
     const [roomData, setRoomData] = useState(null)
     const [selectedLanguage, setSelectedLanguage] = useState('javascript');
@@ -57,10 +57,32 @@ const CodingArea = () => {
     const [chatInput, setChatInput] = useState("");
     const [timeLeft, setTimeLeft] = useState(45 * 60); // Default 45 mins
     const [isRunning, setIsRunning] = useState(false);
-    
+    const [activeProblemId, setActiveProblemId] = useState(null);
     // Problem Data
-    const prob = dataset[0]
-    const testcases = [prob.tests[0], prob.tests[1], prob.tests[2]]
+    useEffect(() => {
+        if (roomData?.problems?.length > 0 && !activeProblemId) {
+            setActiveProblemId(roomData.problems[0]);
+        }
+    }, [roomData]);
+
+    const prob = useMemo(() => {
+        if (!activeProblemId) return null;
+        return dataset.find((p) => p.id === activeProblemId);
+    }, [activeProblemId]);
+
+    const testcases = useMemo(() => {
+        if (!prob || !prob.tests) return [];
+        return prob.tests.slice(0, 3);
+    }, [prob]);
+
+    useEffect(() => {
+        // Added 'prob' to the check
+        if (prob?.starterCode?.[selectedLanguage]) {
+            setEditorCode(prob.starterCode[selectedLanguage]);
+        } else {
+            setEditorCode("");
+        }
+    }, [selectedLanguage, prob])
 
     useEffect(() => {
         if (!currentUser || !code) return;
@@ -74,8 +96,8 @@ const CodingArea = () => {
                 toast.error("Room ended or does not exist.");
                 navigate(`/room`);
                 return;
-            } 
-            
+            }
+
             const data = snapshot.val();
             setRoomData(data);
 
@@ -102,14 +124,13 @@ const CodingArea = () => {
 
     useEffect(() => {
         let interval;
-        
+
         if (roomData?.status === "ongoing" && roomData?.startTime) {
             // Function to calculate remaining time based on Server Start Time
             const updateTimer = () => {
                 const now = Date.now();
                 const elapsedSeconds = (now - roomData.startTime) / 1000;
-                const remaining = (45 * 60) - elapsedSeconds; // 45 mins duration
-                
+                const remaining = (45 * 60) - elapsedSeconds;
                 setTimeLeft(remaining > 0 ? remaining : 0);
             };
 
@@ -125,14 +146,11 @@ const CodingArea = () => {
         }
     }, [roomData?.status, roomData?.startTime]);
 
-    // --- 3. Update Code on Language Change ---
     useEffect(() => {
         if (prob?.starterCode?.[selectedLanguage]) {
             setEditorCode(prob.starterCode[selectedLanguage]);
         }
     }, [selectedLanguage]);
-
-    // --- Handlers ---
 
     const handleEditorChange = (value) => {
         setEditorCode(value || "");
@@ -158,13 +176,12 @@ const CodingArea = () => {
         }, 2000);
     };
 
-    // --- START MATCH FUNCTION ---
     const handleStartMatch = async () => {
         const roomRef = ref(rtdb, `rooms/${code}`);
         try {
             await update(roomRef, {
                 status: "ongoing",
-                startTime: Date.now() // Use timestamp to sync users
+                startTime: Date.now()
             });
             toast.success("Match Started! Timer running.");
         } catch (error) {
@@ -173,17 +190,15 @@ const CodingArea = () => {
         }
     }
 
-    // --- LEAVE / ARCHIVE FUNCTION ---
     const handleLeave = async () => {
-        if(!currentUser) return;
+        if (!currentUser) return;
 
         const roomRef = ref(rtdb, `rooms/${code}`);
         const playerRef = ref(rtdb, `rooms/${code}/players/${currentUser.uid}`);
 
         try {
             const snapshot = await get(roomRef);
-            
-            // Handle case where room is already deleted
+
             if (!snapshot.exists()) {
                 navigate(`/room`);
                 return;
@@ -193,17 +208,13 @@ const CodingArea = () => {
             const isHost = currentRoomData?.players?.[currentUser.uid]?.isHost;
 
             if (isHost) {
-                // 1. Prepare Data: Deep copy and strip 'undefined' to prevent Firestore crash
                 const safeData = JSON.parse(JSON.stringify(currentRoomData));
-                
-                // 2. Add to Firestore
                 await addDoc(collection(db, "roomsData"), {
                     ...safeData,
                     roomId: code,
                     archivedAt: serverTimestamp()
                 });
 
-                // 3. Delete from RTDB
                 await remove(roomRef);
                 toast.success("Room archived and closed.");
             } else {
@@ -237,12 +248,19 @@ const CodingArea = () => {
 
     // Determine if current user is host
     const isHost = roomData?.players?.[currentUser?.uid]?.isHost;
-
+    if (!roomData || !prob) {
+        return (
+            <div className="h-screen w-full flex flex-col items-center justify-center gap-4 bg-background">
+                <Loader2 className="animate-spin h-10 w-10 text-primary" />
+                <p className="text-muted-foreground animate-pulse">Loading Room & Problem...</p>
+            </div>
+        )
+    }
     return (
         <div className='h-screen flex flex-col bg-background'>
-            
+
             <ResizablePanelGroup direction="horizontal" className="w-full h-full">
-                
+
                 {/* --- PANEL 1: PROBLEM DESCRIPTION --- */}
                 <ResizablePanel defaultSize={40} minSize={25} maxSize={45}>
                     <ResizablePanelGroup direction="vertical" className="w-full h-full">
@@ -250,19 +268,22 @@ const CodingArea = () => {
                             <ScrollArea className="w-full h-full px-2 bg-accent/10">
                                 <div className='p-4 flex flex-col gap-4'>
                                     <div className='flex justify-between items-start'>
-                                        <div>
-                                            <h1 className='font-bold text-2xl tracking-tight'>{prob.title}</h1>
-                                            <div className='flex gap-2 mt-2'>
-                                                <Badge variant={prob.difficulty === "Hard" ? "destructive" : prob.difficulty === "Medium" ? "default" : "secondary"}>
+                                        <div className='w-full'>
+                                            <div className='flex justify-between'>
+
+                                                <h1 className='font-bold text-2xl tracking-tight '>{prob.title}</h1>
+                                                <Badge variant={prob.difficulty} className="h-fit py-2 px-5">
                                                     {prob.difficulty}
                                                 </Badge>
+                                            </div>
+                                            <div className='flex gap-2 mt-2'>
                                                 {prob.tags.map((tag) => (
                                                     <Badge key={tag} variant="outline" className="capitalize text-xs">{tag}</Badge>
                                                 ))}
                                             </div>
                                         </div>
                                     </div>
-                                    
+
                                     <div className='text-sm text-muted-foreground text-justify leading-relaxed'>
                                         {prob.statement}
                                     </div>
@@ -282,9 +303,9 @@ const CodingArea = () => {
                                             ))}
                                         </div>
                                     </div>
-                                    
+
                                     <Separator />
-                                    
+
                                     <div>
                                         <h2 className='font-semibold text-lg mb-2'>Constraints</h2>
                                         <ul className='list-disc list-inside text-sm text-muted-foreground'>
@@ -294,14 +315,91 @@ const CodingArea = () => {
                                 </div>
                             </ScrollArea>
                         </ResizablePanel>
-                        
+
                         <ResizableHandle withHandle />
-                        
-                        {/* Sub-Panel: Collaborative Notes Placeholder */}
-                        <ResizablePanel defaultSize={20} minSize={0} collapsible>
-                             <div className='p-4 text-center text-muted-foreground text-sm flex flex-col items-center justify-center h-full gap-2'>
-                                <span>Collaborative Notes Coming Soon</span>
-                             </div>
+                        <ResizablePanel defaultSize={30} minSize={20} collapsible>
+                            <ScrollArea className="h-full bg-muted/5">
+                                <div className="p-4 flex flex-col gap-4">
+
+                                    {/* Header */}
+                                    <div className="flex items-center justify-between px-1">
+                                        <div className="flex items-center gap-2">
+                                            <ListTodo className="h-4 w-4 text-primary" />
+                                            <h3 className="font-semibold text-sm text-foreground tracking-tight">
+                                                Problem List
+                                            </h3>
+                                        </div>
+                                        <Badge variant="secondary" className="px-2 h-5 text-[10px] font-mono bg-primary/10 text-primary hover:bg-primary/20 border-primary/20">
+                                            {roomData?.problems?.length || 0}
+                                        </Badge>
+                                    </div>
+
+                                    {/* Problem List */}
+                                    <div className="flex flex-col gap-2.5">
+                                        {roomData?.problems?.map((id, index) => {
+                                            // Find details from dataset
+                                            const details = dataset.find(p => p.id === id);
+                                            if (!details) return null;
+
+                                            const isActive = activeProblemId === id;
+
+                                            // Helper for dynamic colors without changing logic structure
+                                            const diffColor =
+                                                details.difficulty === 'Easy' ? 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20' :
+                                                    details.difficulty === 'Medium' ? 'text-amber-500 bg-amber-500/10 border-amber-500/20' :
+                                                        'text-rose-500 bg-rose-500/10 border-rose-500/20';
+
+                                            return (
+                                                <div
+                                                    key={id}
+                                                    onClick={() => setActiveProblemId(id)}
+                                                    className={`
+                                group relative flex flex-col gap-2 rounded-lg border p-3 text-left transition-all duration-200 cursor-pointer
+                                hover:border-primary/50 hover:shadow-sm
+                                ${isActive
+                                                            ? "bg-background border-primary/60 shadow-md ring-1 ring-primary/10"
+                                                            : "bg-card border-border/60 text-muted-foreground hover:bg-accent/50"
+                                                        }
+                            `}
+                                                >
+                                                    {/* Active Indicator Strip */}
+                                                    {isActive && (
+                                                        <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-primary rounded-l-lg" />
+                                                    )}
+
+                                                    <div className="flex justify-between items-start gap-3 pl-2">
+                                                        <div className="flex flex-col gap-1.5 overflow-hidden">
+                                                            <div className="flex items-center gap-2.5">
+                                                                <span className={`text-xs font-mono ${isActive ? 'text-primary/70' : 'text-muted-foreground/40'}`}>
+                                                                    #{String(index + 1).padStart(2, '0')}
+                                                                </span>
+                                                                <span className={`text-sm font-semibold truncate leading-none tracking-tight ${isActive ? 'text-foreground' : 'text-foreground/80'}`}>
+                                                                    {details.title}
+                                                                </span>
+                                                            </div>
+
+                                                            {/* Tags Row */}
+                                                            <div className="flex items-center gap-2">
+                                                                {details.tags?.[0] && (
+                                                                    <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-muted font-medium text-muted-foreground capitalize">
+                                                                        {details.tags[0]}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Difficulty Badge */}
+                                                        <Badge variant={details.difficulty}>
+                                                            {details.difficulty}
+                                                        </Badge>
+                                                    </div>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+
+                                </div>
+                            </ScrollArea>
                         </ResizablePanel>
                     </ResizablePanelGroup>
                 </ResizablePanel>
@@ -311,7 +409,7 @@ const CodingArea = () => {
                 {/* --- PANEL 2: EDITOR & TEST CASES --- */}
                 <ResizablePanel defaultSize={60}>
                     <ResizablePanelGroup direction="vertical">
-                        
+
                         {/* Editor Toolbar */}
                         <div className='h-12 border-b flex items-center justify-between px-4 bg-card'>
                             <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
@@ -326,13 +424,13 @@ const CodingArea = () => {
                             </Select>
 
                             <div className='flex gap-2'>
-                                <Button 
-                                    size="sm" 
-                                    onClick={handleRunCode} 
+                                <Button
+                                    size="sm"
+                                    onClick={handleRunCode}
                                     disabled={isRunning}
                                     className="bg-green-600 hover:bg-green-700 text-white"
                                 >
-                                    {isRunning ? <Loader2 className="animate-spin mr-2 h-4 w-4"/> : <Play className="mr-2 h-4 w-4 fill-current"/>}
+                                    {isRunning ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <Play className="mr-2 h-4 w-4 fill-current" />}
                                     Run Code
                                 </Button>
                             </div>
@@ -349,9 +447,9 @@ const CodingArea = () => {
                                 onChange={handleEditorChange}
                             />
                         </ResizablePanel>
-                        
+
                         <ResizableHandle withHandle />
-                        
+
                         {/* Test Cases Panel */}
                         <ResizablePanel defaultSize={35} minSize={20} className="flex flex-col bg-muted/10">
                             <div className="flex items-center justify-between px-4 py-2 border-b bg-background">
@@ -365,7 +463,7 @@ const CodingArea = () => {
                                     <CarouselContent>
                                         {testcases.map((test, index) => (
                                             <CarouselItem key={index} className="md:basis-1/2 lg:basis-1/2">
-                                                 <Card className='h-full'>
+                                                <Card className='h-full'>
                                                     <CardHeader className="p-3 pb-0">
                                                         <CardTitle className="text-sm font-medium">Case {index + 1}</CardTitle>
                                                     </CardHeader>
@@ -379,7 +477,7 @@ const CodingArea = () => {
                                                             <div className="bg-muted p-1 rounded mt-1 truncate">{test.output}</div>
                                                         </div>
                                                     </CardContent>
-                                                 </Card>
+                                                </Card>
                                             </CarouselItem>
                                         ))}
                                     </CarouselContent>
@@ -399,23 +497,23 @@ const CodingArea = () => {
                         {/* Room Code & Timer */}
                         <div className='p-4 border-b flex flex-col items-center gap-3'>
                             <div className='flex items-center gap-2 text-yellow-500 font-bold bg-yellow-500/10 border border-yellow-500/20 px-4 py-1.5 rounded-full text-sm'>
-                                {roomData?.status === "ongoing" ? <Lock size={14}/> : <Link size={14} />} 
+                                {roomData?.status === "ongoing" ? <Lock size={14} /> : <Link size={14} />}
                                 {code}
                             </div>
                             <div className={`text-2xl font-mono font-bold ${timeLeft < 300 && roomData?.status === "ongoing" ? 'text-red-500 animate-pulse' : 'text-primary'}`}>
                                 {formatTime(timeLeft)}
                             </div>
-                            
+
                             {/* START MATCH BUTTON (Only for Host & if not started) */}
                             {isHost && roomData?.status !== "ongoing" && (
-                                <Button 
-                                    onClick={handleStartMatch} 
+                                <Button
+                                    onClick={handleStartMatch}
                                     className="w-full bg-blue-600 hover:bg-blue-700 h-8 text-xs"
                                 >
                                     <PlayCircle className="mr-2 h-4 w-4" /> Start Match
                                 </Button>
                             )}
-                            
+
                             {/* Status Indicator */}
                             {roomData?.status === "ongoing" && (
                                 <Badge variant="secondary" className="w-full justify-center bg-green-500/10 text-green-500 hover:bg-green-500/20 border-green-500/50">
@@ -447,7 +545,7 @@ const CodingArea = () => {
                                 </TooltipTrigger>
                                 <TooltipContent>Reset Code</TooltipContent>
                             </Tooltip>
-                            
+
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <Button variant="destructive" size="icon" className="w-full" onClick={handleLeave}>
@@ -468,8 +566,8 @@ const CodingArea = () => {
                                 </SheetTrigger>
                                 <SheetContent side="right" className="flex flex-col h-full">
                                     <SheetTitle>Room Chat</SheetTitle>
-                                    <Separator className="my-2"/>
-                                    
+                                    <Separator className="my-2" />
+
                                     {/* Chat Messages Area */}
                                     <ScrollArea className="flex-1 pr-4">
                                         <div className="flex flex-col gap-3">
@@ -487,13 +585,13 @@ const CodingArea = () => {
 
                                     <SheetFooter className="mt-4">
                                         <div className="flex w-full gap-2">
-                                            <Input 
-                                                value={chatInput} 
-                                                onChange={(e) => setChatInput(e.target.value)} 
+                                            <Input
+                                                value={chatInput}
+                                                onChange={(e) => setChatInput(e.target.value)}
                                                 onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                                                placeholder="Type message..." 
+                                                placeholder="Type message..."
                                             />
-                                            <Button size="icon" onClick={handleSendMessage}><Send size={16}/></Button>
+                                            <Button size="icon" onClick={handleSendMessage}><Send size={16} /></Button>
                                         </div>
                                     </SheetFooter>
                                 </SheetContent>
@@ -501,8 +599,8 @@ const CodingArea = () => {
                         </div>
                     </div>
                 </ResizablePanel>
-            </ResizablePanelGroup>
-        </div>
+            </ResizablePanelGroup >
+        </div >
     )
 }
 

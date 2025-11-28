@@ -28,13 +28,11 @@ const RoomPage = () => {
   const [isCopied, setIsCopied] = useState(false);
   const { currentUser, userData } = useAuth()
   const [roomCode, setRoomCode] = useState('')
-  // Inputs From Code
   const [inpJoinCode, setInpJoinCode] = useState('')
   const [mode, setMode] = useState('dsa')
   const [difficulty, setDifficulty] = useState('easy')
   const [inpCreateRoomName, setInpCreateRoomName] = useState('')
 
-  // console.log(currentUser)
   const handleCopy = async (code) => {
     if (isCopied) return;
     try {

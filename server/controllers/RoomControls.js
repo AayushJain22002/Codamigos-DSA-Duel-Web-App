@@ -1,7 +1,22 @@
+import { dataset } from "../../client/src/data/problems.js";
 import { rtdb } from "../firebaseAdmin.js";
 import { generateRoomCode } from "../utils/generateRoomCode.js"
 
+// console.log(dataset[0])
+
+const pickRandomProblems = (count = 3) => {
+    const ids = dataset.map(p => p.id);
+    const selected = [];
+
+    while (selected.length < count) {
+        const rand = ids[Math.floor(Math.random() * ids.length)];
+        if (!selected.includes(rand)) selected.push(rand);
+    }
+    return selected;
+}
+
 export const createRoom = async (req, res) => {
+    const problems = pickRandomProblems(3);
     try {
         const { roomName, mode, difficulty, user } = req.body || {};
 
@@ -31,8 +46,10 @@ export const createRoom = async (req, res) => {
             roomName: roomName || "Untitled Room",
             mode: mode || "dsa",
             difficulty: difficulty || "mixed",
-            status: "waiting", 
+            status: "waiting",
             createdAt: now,
+            problems,
+            activeProblem: 0,
             players: {
                 [user.uid]: {
                     uid: user.uid,
