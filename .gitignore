@@ -1,3 +1,4 @@
 *node_modules
 *.env
 *keyFirebase.json
+*vectors_logo.zip

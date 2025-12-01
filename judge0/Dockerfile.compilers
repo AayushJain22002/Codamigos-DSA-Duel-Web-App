@@ -10,7 +10,11 @@ RUN apt-get update && apt-get install -y \
     pkg-config libsystemd-dev sudo \
     && rm -rf /var/lib/apt/lists/*
 
+RUN apt-get update && \
+    apt-get install -y nodejs npm && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 # 2. Install Isolate
+
 RUN git clone https://github.com/ioi/isolate.git /tmp/isolate && \
     cd /tmp/isolate && \
     make isolate && \
@@ -50,6 +54,7 @@ RUN useradd -d /judge0 -s /bin/bash judge0
 RUN echo "judge0 ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 
 # --- FIX 6: CREATE SHORTCUTS (Fixes "No such file" error) ---
+  
 # Redirect the database's expected Python path to the real one
 RUN mkdir -p /usr/local/python-3.8.1/bin
 RUN ln -s /usr/bin/python3 /usr/local/python-3.8.1/bin/python3
@@ -63,6 +68,10 @@ RUN ln -s /usr/bin/javac /usr/local/openjdk13/bin/javac
 RUN mkdir -p /usr/local/gcc-9.2.0/bin
 RUN ln -s /usr/bin/gcc /usr/local/gcc-9.2.0/bin/gcc
 RUN ln -s /usr/bin/g++ /usr/local/gcc-9.2.0/bin/g++
+
+# Redirect NODE
+RUN mkdir -p /usr/local/node-12.14.0/bin
+RUN ln -s /usr/bin/node /usr/local/node-12.14.0/bin/node
 # -----------------------------------------------------------
 
 # 5. Install Ruby Libraries
