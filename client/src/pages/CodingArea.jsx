@@ -35,7 +35,7 @@ import { FaCrown, FaUser } from 'react-icons/fa'
 import { useAuth } from '../lib/AuthProvider'
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore'
 import toast from 'react-hot-toast'
-
+import api from '../lib/api.js'
 // Helper to format time (MM:SS)
 const formatTime = (seconds) => {
     if (seconds <= 0) return "00:00";
@@ -168,12 +168,20 @@ const CodingArea = () => {
         setChatInput("");
     };
 
-    const handleRunCode = () => {
-        setIsRunning(true);
-        setTimeout(() => {
-            setIsRunning(false);
-            toast.success("All Test Cases Passed! (Simulated)");
-        }, 2000);
+    const handleRunCode = async () => {
+        try {
+            const res = await api.post('/api/judge0/run-code', // Frontend Payload
+                {
+                    language_id: 71,
+                    stdin: "10 20",
+                    source_code: "import sys\na, b = map(int, sys.stdin.read().split())\nprint(a + b)",
+                    expected_output: "80"
+                }
+            )
+            console.log(res.data)
+        } catch (error) {
+            console.log(error)
+        }
     };
 
     const handleStartMatch = async () => {

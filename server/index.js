@@ -3,6 +3,7 @@ import cors from 'cors'
 import { Server } from 'socket.io'
 import http from 'http';
 import RoomRoutes from './routes/RoomRoute.js';
+import judgeRoute from './routes/JusgeRoutes.js';
 
 // Constants
 const PORT = process.env.PORT || 4000;
@@ -26,6 +27,7 @@ app.get("/", (req, res) => {
 });
 
 app.use('/api/rooms', RoomRoutes)
+app.use('/api/judge0', judgeRoute)
 //Socket.io
 io.on("connection", (socket) => {
     console.log("🔌 New client connected:", socket.id);
