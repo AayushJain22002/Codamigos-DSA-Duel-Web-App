@@ -42,14 +42,14 @@ const Leaderboard = () => {
         initial={{ opacity: 0, scale: 0.6 }}
         animate={{ opacity: 0.25, scale: 1 }}
         transition={{ duration: 1.3 }}
-        className="absolute top-20 left-10 w-72 h-72 bg-yellow-500 rounded-full blur-[140px]"
+        className="absolute top-20 left-10 w-72 h-72 bg-yellow-500 rounded-full blur-[140px] -z-10"
       />
 
       <motion.div
         initial={{ opacity: 0, scale: 0.6 }}
         animate={{ opacity: 0.25, scale: 1 }}
         transition={{ duration: 1.3, delay: 0.3 }}
-        className="absolute bottom-10 right-10 w-72 h-72 bg-yellow-400 rounded-full blur-[150px]"
+        className="absolute bottom-10 right-10 w-72 h-72 bg-yellow-400 rounded-full blur-[150px] -z-10"
       />
 
       {/* Title */}
