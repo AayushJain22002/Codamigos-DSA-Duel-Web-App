@@ -1,168 +1,346 @@
-import React from "react";
-import { motion } from "motion/react";
+import React, { useEffect, useState, useCallback } from "react";
+import { motion } from "framer-motion";
 import { Badge } from "../../components/ui/badge.jsx";
 import { Card, CardContent, CardHeader } from "../../components/ui/card.jsx";
-
-const mockData = [
-  { id: 1, username: "Alice", score: 2500, avatar: "https://i.pravatar.cc/60?img=1" },
-  { id: 2, username: "Bob", score: 2480, avatar: "https://i.pravatar.cc/60?img=2" },
-  { id: 3, username: "Charlie", score: 2410, avatar: "https://i.pravatar.cc/60?img=3" },
-  { id: 4, username: "David", score: 2370, avatar: "https://i.pravatar.cc/60?img=4" },
-  { id: 5, username: "Evelyn", score: 2320, avatar: "https://i.pravatar.cc/60?img=5" },
-  { id: 6, username: "Fiona", score: 2290, avatar: "https://i.pravatar.cc/60?img=6" },
-  { id: 7, username: "George", score: 2240, avatar: "https://i.pravatar.cc/60?img=7" },
-  { id: 8, username: "Hannah", score: 2190, avatar: "https://i.pravatar.cc/60?img=8" },
-  { id: 9, username: "Ian", score: 2140, avatar: "https://i.pravatar.cc/60?img=9" },
-  { id: 10, username: "Julia", score: 2100, avatar: "https://i.pravatar.cc/60?img=10" },
-
-  { id: 11, username: "Kevin", score: 2050, avatar: "https://i.pravatar.cc/60?img=11" },
-  { id: 12, username: "Lara", score: 2010, avatar: "https://i.pravatar.cc/60?img=12" },
-  { id: 13, username: "Mason", score: 1970, avatar: "https://i.pravatar.cc/60?img=13" },
-  { id: 14, username: "Nora", score: 1920, avatar: "https://i.pravatar.cc/60?img=14" },
-  { id: 15, username: "Oliver", score: 1890, avatar: "https://i.pravatar.cc/60?img=15" },
-  { id: 16, username: "Priya", score: 1840, avatar: "https://i.pravatar.cc/60?img=16" },
-  { id: 17, username: "Quinn", score: 1800, avatar: "https://i.pravatar.cc/60?img=17" },
-  { id: 18, username: "Rohan", score: 1760, avatar: "https://i.pravatar.cc/60?img=18" },
-  { id: 19, username: "Sofia", score: 1720, avatar: "https://i.pravatar.cc/60?img=19" },
-  { id: 20, username: "Thomas", score: 1690, avatar: "https://i.pravatar.cc/60?img=20" }
-];
-
+import { collection, getDocs, limit, orderBy, query } from "firebase/firestore";
+import { useAuth } from "../lib/AuthProvider.jsx";
+import { db } from "../../firebase.js";
 
 const Leaderboard = () => {
-  const sorted = [...mockData].sort((a, b) => b.score - a.score);
-  const empty = sorted.length === 0;
+  const [discoverUsers, setDiscoverUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const { user: currentUser } = useAuth?.() || {};
 
-  const rankColors = ["text-yellow-400", "text-gray-300", "text-amber-700"];
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 6;
+
+  const fetchTopPlayers = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const q = query(collection(db, "users"), orderBy("elo", "desc"), limit(20));
+      const snapshot = await getDocs(q);
+
+      if (snapshot.empty) {
+        setCurrentPage(1);
+        return;
+      }
+
+      const users = snapshot.docs
+        .map((doc) => {
+          const data = doc.data();
+          const id = doc.id;
+          const avatar = data?.avatarUrl ?? null;
+          const username = data?.displayName || data?.userHandle || "Anonymous";
+          const handle = data?.userHandle || null;
+          const score = typeof data?.elo === "number" ? data.elo : 0;
+          return { id, avatar, username, handle, score };
+        })
+        .filter(Boolean);
+
+      setDiscoverUsers(users);
+      setCurrentPage(1);
+    } catch (e) {
+      console.error("Error fetching top players", e);
+      setError("Failed to load leaderboard — showing demo data.");
+      setCurrentPage(1);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchTopPlayers();
+  }, [fetchTopPlayers]);
+
+  // defensive sort by score descending
+  const sorted = [...discoverUsers].sort((a, b) => b.score - a.score);
+  const totalItems = sorted.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const empty = totalItems === 0;
+
+  // keep page in range
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [totalPages, currentPage]);
+
+  const start = (currentPage - 1) * pageSize;
+  const paged = sorted.slice(start, start + pageSize);
+
+  const goTo = (page) => {
+    const p = Math.min(Math.max(1, page), totalPages);
+    setCurrentPage(p);
+    const el = document.querySelector("[data-leaderboard-top]");
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const cardVariants = {
+    hidden: { opacity: 0, y: 8 },
+    show: (i = 1) => ({ opacity: 1, y: 0, transition: { delay: i * 0.04 } }),
+  };
+
+  // Helper to form img src from avatar field in DB
+  const imgSrcFromAvatarField = (avatarField) =>
+    avatarField ? `/avatars/${avatarField}` : "/avatars/default.png";
 
   return (
-    <section className="relative min-h-screen w-full bg-[#0a0a0a] text-white flex flex-col items-center pt-28 px-6 overflow-hidden">
-      
-      {/* Background Glows */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.6 }}
-        animate={{ opacity: 0.25, scale: 1 }}
-        transition={{ duration: 1.3 }}
-        className="absolute top-20 left-10 w-72 h-72 bg-yellow-500 rounded-full blur-[140px] -z-10"
-      />
+    <section className="relative min-h-screen w-full text-white flex flex-col items-center pt-28 px-6 overflow-hidden">
+      {/* header */}
+      <div className="w-full max-w-5xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4" data-leaderboard-top>
+        <div>
+          <motion.h1
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+            className="text-4xl font-bold text-neutral-100"
+          >
+            Leaderboard
+          </motion.h1>
+          <p className="text-neutral-400 mt-2 text-sm">
+            Top players — showing {totalItems || 0}
+          </p>
+        </div>
 
-      <motion.div
-        initial={{ opacity: 0, scale: 0.6 }}
-        animate={{ opacity: 0.25, scale: 1 }}
-        transition={{ duration: 1.3, delay: 0.3 }}
-        className="absolute bottom-10 right-10 w-72 h-72 bg-yellow-400 rounded-full blur-[150px] -z-10"
-      />
+        <div className="flex gap-3 items-center">
+          <button
+            onClick={fetchTopPlayers}
+            className="px-3 py-2 rounded-md bg-white/6 hover:bg-white/10 transition text-sm"
+            aria-label="Refresh leaderboard"
+          >
+            Refresh
+          </button>
 
-      {/* Title */}
-      <motion.h1 
-        initial={{ opacity: 0, y: -16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-        className="text-5xl font-extrabold text-yellow-500 tracking-tight drop-shadow-xl"
-      >
-        Leaderboard 🏆
-      </motion.h1>
+          <div className="text-sm text-neutral-300">
+            Page <span className="font-medium text-neutral-100">{currentPage}</span> of <span className="font-medium text-neutral-100">{totalPages}</span>
+          </div>
+        </div>
+      </div>
 
-      {/* Subtitle */}
-      <motion.p
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 0.8 }}
-        transition={{ delay: 0.4 }}
-        className="text-neutral-400 mt-2 text-lg"
-      >
-        Track the best coders in the arena
-      </motion.p>
-
-
-      {/* Empty State */}
-      {empty && (
-        <div className="mt-20 text-center">
-          <h2 className="text-2xl font-semibold opacity-80">No players yet</h2>
-          <p className="mt-2 text-neutral-400">Be the first to battle and claim rank #1</p>
+      {/* error */}
+      {error && (
+        <div className="mt-6 px-4 py-2 rounded-md bg-red-600/10 text-red-200 text-sm max-w-5xl w-full">
+          {error}
         </div>
       )}
 
-      {/* Desktop Table */}
-      {!empty && (
+      {/* loading skeleton */}
+      {loading && (
+        <div className="w-full max-w-5xl mt-8">
+          <div className="bg-white/4 border border-white/8 rounded-xl p-6 animate-pulse">
+            <div className="h-5 w-2/12 bg-white/10 rounded mb-6" />
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="flex items-center gap-4 py-3">
+                <div className="w-12 h-12 rounded-full bg-white/10" />
+                <div className="flex-1">
+                  <div className="h-4 w-1/3 bg-white/10 rounded mb-2" />
+                  <div className="h-3 w-1/6 bg-white/10 rounded" />
+                </div>
+                <div className="w-16 h-6 bg-white/10 rounded" />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!loading && empty && (
+        <div className="mt-20 text-center">
+          <h2 className="text-xl font-semibold text-neutral-100">No players yet</h2>
+          <p className="mt-2 text-neutral-400">Be the first to play and claim the top rank</p>
+        </div>
+      )}
+
+      {!loading && !empty && (
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="hidden md:block w-full max-w-5xl mt-12 rounded-xl overflow-hidden backdrop-blur-xl bg-white/5 border border-white/10 shadow-xl"
+          transition={{ duration: 0.35 }}
+          className="hidden md:block w-full max-w-5xl mt-8 rounded-xl overflow-hidden bg-white/3 border border-white/6"
+          role="table"
+          aria-label="Leaderboard table"
         >
-          {/* Head */}
-          <div className="bg-white/10 px-6 py-4 flex text-sm font-semibold text-neutral-300 uppercase tracking-wider">
-            <div className="w-20">Rank</div>
-            <div className="flex-1">Player</div>
-            <div className="w-32 text-right">Score</div>
-            <div className="w-32 text-center">Avatar</div>
+          <div className="px-6 py-3 flex items-center justify-between text-sm font-medium text-neutral-300 border-b border-white/6">
+            <div className="flex items-center gap-6">
+              <div className="w-20">Rank</div>
+              <div className="flex-1">Player</div>
+            </div>
+
+            <div className="flex items-center gap-6">
+              <div className="w-32 text-right">Score</div>
+              <div className="w-32 text-center">Avatar</div>
+            </div>
           </div>
 
-          {/* Rows */}
-          <div className="divide-y divide-white/10">
-            {sorted.map((user, index) => (
-              <motion.div
-                key={user.id}
-                whileHover={{ backgroundColor: "rgba(255,255,255,0.06)", scale: 1.01 }}
-                transition={{ duration: 0.2 }}
-                className="flex items-center px-6 py-4"
+          <div className="divide-y divide-white/6">
+            {paged.map((user, idx) => {
+              const absoluteIndex = start + idx;
+              const isCurrent = currentUser && currentUser.uid === user.id;
+              return (
+                <div key={user.id} className={`flex items-center px-6 py-4 ${isCurrent ? "bg-white/5" : ""}`}>
+                  <div className="w-20 font-semibold">#{absoluteIndex + 1}</div>
+
+                  <div className="flex-1 text-sm">{user.username}</div>
+
+                  <div className="w-32 text-right font-medium">{user.score}</div>
+
+                  <div className="w-32 flex justify-center">
+                    <img
+                      src={imgSrcFromAvatarField(user.avatar)}
+                      alt={`${user.username} avatar`}
+                      className="w-10 h-10 rounded-full object-cover border"
+                      onError={(e) => {
+                        e.currentTarget.onerror = null;
+                        e.currentTarget.src = "/avatars/default.png";
+                      }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="px-6 py-3 flex items-center justify-between border-t border-white/6 bg-white/2">
+            <div className="text-sm text-neutral-300">
+              Showing <span className="text-neutral-100 font-medium">{start + 1}</span>–<span className="text-neutral-100 font-medium">{Math.min(start + pageSize, totalItems)}</span> of <span className="text-neutral-100 font-medium">{totalItems}</span>
+            </div>
+
+            <div className="inline-flex items-center gap-2">
+              <button
+                onClick={() => goTo(currentPage - 1)}
+                disabled={currentPage === 1}
+                className={`px-3 py-1 rounded-md text-sm ${currentPage === 1 ? "opacity-40 cursor-not-allowed" : "bg-white/6 hover:bg-white/8"}`}
               >
-                <div className={`w-20 font-bold ${rankColors[index] || "text-gray-500"}`}>
-                  #{index + 1}
-                </div>
+                Prev
+              </button>
 
-                <div className="flex-1 font-medium">{user.username}</div>
+              {Array.from({ length: totalPages }).map((_, i) => {
+                const p = i + 1;
+                // keep pagination simple: show all pages if <= 7, otherwise show neighbors
+                const showAll = totalPages <= 7;
+                const show = showAll || p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1;
+                if (!show) {
+                  // show ellipsis only where appropriate
+                  const before = p === 2 && currentPage > 3;
+                  const after = p === totalPages - 1 && currentPage < totalPages - 2;
+                  if (before || after) {
+                    return <span key={p} className="px-2 text-sm text-neutral-400">…</span>;
+                  }
+                  return null;
+                }
+                return (
+                  <button
+                    key={p}
+                    onClick={() => goTo(p)}
+                    aria-current={p === currentPage ? "page" : undefined}
+                    className={`px-3 py-1 rounded-md text-sm ${p === currentPage ? "bg-neutral-100 text-black font-medium" : "bg-white/6 hover:bg-white/8"}`}
+                  >
+                    {p}
+                  </button>
+                );
+              })}
 
-                <div className="w-32 text-right font-semibold text-yellow-400">
-                  {user.score}
-                </div>
-
-                <div className="w-32 flex justify-center">
-                  <img
-                    src={user.avatar}
-                    alt={user.username}
-                    className="w-12 h-12 rounded-full border border-yellow-400/30 shadow-md object-cover"
-                  />
-                </div>
-              </motion.div>
-            ))}
+              <button
+                onClick={() => goTo(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className={`px-3 py-1 rounded-md text-sm ${currentPage === totalPages ? "opacity-40 cursor-not-allowed" : "bg-white/6 hover:bg-white/8"}`}
+              >
+                Next
+              </button>
+            </div>
           </div>
         </motion.div>
       )}
 
-      {/* Mobile Cards */}
-      {!empty && (
-        <div className="grid md:hidden gap-5 w-full max-w-md mt-10 pb-20">
-          {sorted.map((user, index) => (
-            <motion.div
-              key={user.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-            >
-              <Card className="bg-white/10 border border-white/10 backdrop-blur-xl shadow-lg rounded-xl p-4 hover:bg-white/20 transition">
-                <CardHeader className="flex flex-row items-center justify-between px-0 pb-2">
-                  <div className="flex items-center gap-3">
-                    <span className={`font-bold text-lg ${rankColors[index] || "text-gray-400"}`}>
-                      #{index + 1}
-                    </span>
-                    <img
-                      src={user.avatar}
-                      alt={user.username}
-                      className="w-12 h-12 rounded-full border border-yellow-400/40 shadow-md object-cover"
-                    />
-                    <h3 className="font-semibold text-white">{user.username}</h3>
-                  </div>
+      {/* Mobile list */}
+      {!loading && !empty && (
+        <div className="grid md:hidden gap-4 w-full max-w-md mt-6 pb-8">
+          {paged.map((user, idx) => {
+            const absoluteIndex = start + idx;
+            const isCurrent = currentUser && currentUser.uid === user.id;
+            return (
+              <motion.div key={user.id} initial="hidden" animate="show" custom={idx} variants={cardVariants}>
+                <Card className={`p-3 ${isCurrent ? "bg-white/5" : "bg-white/3"} border`}>
+                  <CardHeader className="flex items-center justify-between px-0 pb-2">
+                    <div className="flex items-center gap-3">
+                      <div className="font-semibold">#{absoluteIndex + 1}</div>
 
-                  <Badge className="bg-yellow-500 text-black text-sm px-4 py-1 rounded-full shadow">
-                    {user.score}
-                  </Badge>
-                </CardHeader>
-              </Card>
-            </motion.div>
-          ))}
+                      <img
+                        src={imgSrcFromAvatarField(user.avatar)}
+                        alt={`${user.username} avatar`}
+                        className="w-10 h-10 rounded-full object-cover border"
+                        onError={(e) => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src = "/avatars/default.png";
+                        }}
+                      />
+
+                      <div>
+                        <h3 className="font-medium text-sm truncate">{user.username}</h3>
+
+                        <div className="flex gap-2 items-center">
+                          {(user.handle) && (
+                            <span className="text-xs text-neutral-400 truncate">
+                              @{user.handle}
+                            </span>
+                          )}
+
+                          <span className="text-xs text-neutral-400">
+                            {isCurrent ? "You" : "Player"}
+                          </span>
+                        </div>
+                      </div>
+
+                    </div>
+
+                    <Badge className="bg-white/7 text-black px-3 py-1 rounded">
+                      {user.score}
+                    </Badge>
+                  </CardHeader>
+
+                  <CardContent className="px-0 pt-2 text-xs text-neutral-300">
+                    <div className="flex items-center justify-between">
+                      <span>ELO: <span className="font-medium">{user.score}</span></span>
+                      <span className="text-xs text-neutral-400">{user.id}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            );
+          })}
+
+          {/* Mobile pagination */}
+          <div className="flex items-center justify-center gap-2 mt-2">
+            <button
+              onClick={() => goTo(currentPage - 1)}
+              disabled={currentPage === 1}
+              className={`px-3 py-2 rounded-md text-sm ${currentPage === 1 ? "opacity-40 cursor-not-allowed" : "bg-white/6 hover:bg-white/8"}`}
+            >
+              Prev
+            </button>
+
+            <div className="inline-flex items-center gap-1 bg-white/6 rounded-md px-2 py-1">
+              <button onClick={() => goTo(1)} className={`px-2 py-1 rounded-md text-sm ${currentPage === 1 ? "bg-neutral-100 text-black font-medium" : "hover:bg-white/8"}`}>1</button>
+              {currentPage > 3 && <span className="px-2 text-sm text-neutral-400">…</span>}
+              {currentPage > 1 && currentPage < totalPages && <button onClick={() => goTo(currentPage)} className="px-2 py-1 rounded-md text-sm bg-white/6">{currentPage}</button>}
+              {currentPage < totalPages - 1 && <span className="px-2 text-sm text-neutral-400">…</span>}
+              {totalPages > 1 && <button onClick={() => goTo(totalPages)} className={`px-2 py-1 rounded-md text-sm ${currentPage === totalPages ? "bg-neutral-100 text-black font-medium" : "hover:bg-white/8"}`}>{totalPages}</button>}
+            </div>
+
+            <button
+              onClick={() => goTo(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className={`px-3 py-2 rounded-md text-sm ${currentPage === totalPages ? "opacity-40 cursor-not-allowed" : "bg-white/6 hover:bg-white/8"}`}
+            >
+              Next
+            </button>
+          </div>
+
+          <div className="text-xs text-neutral-400 text-center mt-2">
+            Showing <span className="text-neutral-100 font-medium">{start + 1}</span>–<span className="text-neutral-100 font-medium">{Math.min(start + pageSize, totalItems)}</span> of <span className="text-neutral-100 font-medium">{totalItems}</span>
+          </div>
         </div>
       )}
-
     </section>
   );
 };

@@ -201,7 +201,7 @@ const FriendsPage = () => {
       fetchTopPlayers();
     }
   }, [activeTab, userData]);
-
+  console.log(discoverUsers)
   const handleInvite = (friend, e) => {
     e.stopPropagation();
     alert(`Invite sent to ${friend.name}`);
@@ -384,8 +384,8 @@ const FriendsPage = () => {
     ];
   }, [incomingReqs, outgoingReqs, search]);
 
-const addResults = useMemo(() => {
-   
+  const addResults = useMemo(() => {
+
     const hiddenIds = new Set([
       ...incomingReqs.map(req => req.id),
       ...outgoingReqs.map(req => req.id),
@@ -397,7 +397,7 @@ const addResults = useMemo(() => {
 
     // 3. Apply Search Logic
     if (!search.trim()) return visibleUsers;
-    
+
     const q = search.toLowerCase();
     return visibleUsers.filter((u) =>
       u.name.toLowerCase().includes(q) ||

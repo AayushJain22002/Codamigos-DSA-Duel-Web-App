@@ -13,7 +13,7 @@ import { Toaster } from "react-hot-toast";
 import Profile from "./pages/Profile.jsx";
 import CodingArea from "./pages/CodingArea.jsx";
 import MyAmigos from "./pages/MyAmigos.jsx";
-import Leaderboard from "./pages/LeaderBoard.jsx";
+import Leaderboard from "./pages/Leaderboard.jsx";
 
 const App = () => {
   const isMobile = () => {

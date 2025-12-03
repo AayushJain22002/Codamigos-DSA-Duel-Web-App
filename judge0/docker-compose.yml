@@ -30,7 +30,7 @@ services:
       - SECRET_KEY_BASE=3b7e651838e146740673322154a413d320576356778641551061732551341013
     command: ["./scripts/server"]
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:2358/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:2358/workers"]
       interval: 5s
       timeout: 5s
       retries: 5
