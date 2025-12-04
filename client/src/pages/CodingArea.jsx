@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
     ResizableHandle,
     ResizablePanel,
@@ -9,6 +9,7 @@ import {
     Sheet,
     SheetContent,
     SheetFooter,
+    SheetHeader,
     SheetTitle,
     SheetTrigger,
 } from "../../components/ui/sheet"
@@ -36,6 +37,7 @@ import { useAuth } from '../lib/AuthProvider'
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore'
 import toast from 'react-hot-toast'
 import api from '../lib/api.js'
+import { Avatar, AvatarFallback, AvatarImage } from '../../components/ui/avatar.jsx'
 // Helper to format time (MM:SS)
 const formatTime = (seconds) => {
     if (seconds <= 0) return "00:00";
@@ -121,6 +123,13 @@ const CodingArea = () => {
             unsubscribeChat();
         };
     }, [code, navigate, currentUser]);
+    const scrollRef = useRef(null);
+
+    useEffect(() => {
+        if (scrollRef.current) {
+            scrollRef.current.scrollIntoView({ behavior: "smooth" });
+        }
+    }, [messages]);
 
     useEffect(() => {
         let interval;
@@ -568,40 +577,112 @@ const CodingArea = () => {
                         <div className='p-3 border-t'>
                             <Sheet>
                                 <SheetTrigger asChild>
-                                    <Button className='w-full gap-2' variant="secondary">
-                                        <BsChatRightTextFill /> Chat
+                                    <Button className='w-full gap-2 shadow-sm' variant="secondary">
+                                        <BsChatRightTextFill /> Chat Room
                                     </Button>
                                 </SheetTrigger>
-                                <SheetContent side="right" className="flex flex-col h-full">
-                                    <SheetTitle>Room Chat</SheetTitle>
-                                    <Separator className="my-2" />
 
-                                    {/* Chat Messages Area */}
-                                    <ScrollArea className="flex-1 pr-4">
-                                        <div className="flex flex-col gap-3">
-                                            {messages.map((msg, i) => (
-                                                <div key={i} className={`flex flex-col ${msg.senderId === currentUser.uid ? 'items-end' : 'items-start'}`}>
-                                                    <div className={`max-w-[85%] rounded-lg p-2 text-sm ${msg.senderId === currentUser.uid ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
-                                                        {msg.text}
-                                                    </div>
-                                                    <span className="text-[10px] text-muted-foreground mt-1">{msg.sender}</span>
+                                {/* KEY FIXES:
+                   1. h-full: Forces sheet to fill screen height.
+                   2. flex flex-col: Enables vertical stacking.
+                   3. overflow-hidden: Prevents double scrollbars.
+                */}
+                                <SheetContent
+                                    side="right"
+                                    className="flex flex-col h-full w-full sm:w-[450px] p-0 gap-0 border-l bg-gray-50 dark:bg-zinc-900"
+                                >
+                                    {/* --- HEADER --- */}
+                                    <SheetHeader className="px-4 py-3 border-b bg-white dark:bg-zinc-950 shadow-sm z-10">
+                                        <SheetTitle className="flex items-center gap-2 text-base font-bold">
+                                            <div className="p-2 bg-primary/10 rounded-full">
+                                                <BsChatRightTextFill className="text-primary w-4 h-4" />
+                                            </div>
+                                            Live Chat
+                                        </SheetTitle>
+                                    </SheetHeader>
+
+                                    <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                                        {messages.length === 0 ? (
+                                            <div className="flex flex-col items-center justify-center h-full text-muted-foreground opacity-60 space-y-4">
+                                                <div className="p-4 bg-muted rounded-full">
+                                                    <BsChatRightTextFill size={32} />
                                                 </div>
-                                            ))}
-                                            {messages.length === 0 && <p className="text-center text-muted-foreground text-sm mt-5">No messages yet.</p>}
-                                        </div>
-                                    </ScrollArea>
+                                                <p className="text-sm font-medium">No messages yet</p>
+                                            </div>
+                                        ) : (
+                                            messages.map((msg, i) => {
+                                                const isMe = msg.senderId === currentUser.uid;
+                                                return (
+                                                    <div
+                                                        key={i}
+                                                        className={`flex w-full gap-2 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}
+                                                    >
+                                                        {/* Avatar Bubble */}
+                                                        <Avatar className="h-8 w-8 mt-1 border">
+                                                            <AvatarImage src={`/avatars/${userData?.avatarurl}`} />
+                                                            <AvatarFallback className="text-[10px] font-bold">
+                                                                {msg.sender ? msg.sender.substring(0, 2).toUpperCase() : "U"}
+                                                            </AvatarFallback>
+                                                        </Avatar>
 
-                                    <SheetFooter className="mt-4">
-                                        <div className="flex w-full gap-2">
+                                                        <div className={`flex flex-col max-w-[75%] ${isMe ? 'items-end' : 'items-start'}`}>
+                                                            {/* Name & Time */}
+                                                            <div className="flex items-center gap-2 mb-1 px-1">
+                                                                <span className="text-[11px] font-semibold text-muted-foreground">
+                                                                    {isMe ? "You" : msg.sender}
+                                                                </span>
+                                                                <span className="text-[10px] text-gray-400">
+                                                                    10:42 AM
+                                                                </span>
+                                                            </div>
+
+                                                            {/* Message Bubble */}
+                                                            <div
+                                                                className={`
+                                                    px-3 py-2 text-sm shadow-sm wrap-break-word leading-relaxed
+                                                    ${isMe
+                                                                        ? 'bg-blue-600 text-white rounded-2xl rounded-tr-none'
+                                                                        : 'bg-white dark:bg-zinc-800 border text-foreground rounded-2xl rounded-tl-none'
+                                                                    }
+                                                `}
+                                                            >
+                                                                {msg.text}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })
+                                        )}
+                                        {/* Dummy div to scroll into view */}
+                                        <div ref={scrollRef} className="pt-2" />
+                                    </div>
+
+                                    {/* --- FOOTER / INPUT --- 
+                        Stays stuck to bottom because of flex layout
+                    */}
+                                    <div className="p-4 bg-white dark:bg-zinc-950 border-t">
+                                        <form
+                                            onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }}
+                                            className="flex items-end gap-2"
+                                        >
                                             <Input
                                                 value={chatInput}
                                                 onChange={(e) => setChatInput(e.target.value)}
-                                                onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                                                placeholder="Type message..."
+                                                placeholder="Write a message..."
+                                                className="flex-1 min-h-11 bg-muted/50 border-0 focus-visible:ring-1 focus-visible:ring-primary focus-visible:bg-background transition-all"
+                                                autoComplete="off"
                                             />
-                                            <Button size="icon" onClick={handleSendMessage}><Send size={16} /></Button>
-                                        </div>
-                                    </SheetFooter>
+                                            <Button
+                                                type="submit"
+                                                size="icon"
+                                                className="h-11 w-11 rounded-full shrink-0 shadow-sm"
+                                                disabled={!chatInput.trim()}
+                                            >
+                                                <Send size={18} className={chatInput.trim() ? "ml-0.5" : ""} />
+                                            </Button>
+                                        </form>
+                                    </div>
+
                                 </SheetContent>
                             </Sheet>
                         </div>
