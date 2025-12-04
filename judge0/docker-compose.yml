@@ -18,9 +18,10 @@ services:
       - RAILS_ENV=production
       - RAILS_LOG_TO_STDOUT=true
       - JUDGE0_SANDBOX_IMAGE=small-judge0:latest
-      # --- CRITICAL FIX: DISABLE CGROUPS ---
+      - JUDGE0_ENABLE_SUBMISSION_DELETE=true  
+      - JUDGE0_AUTH_ENFORCED=false
+      - JUDGE0_ENABLE_SUBMISSION_READ=true
       - JUDGE0_USE_CGROUPS=false
-      # -------------------------------------
       - REDIS_PASSWORD=judge0
       - POSTGRES_PASSWORD=judge0
       - POSTGRES_USER=judge0
