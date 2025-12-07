@@ -77,6 +77,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "../../components/ui/alert-dialog";
+import { useNotifications } from "../utils/useNotifications";
+import toast from "react-hot-toast";
+
+
 // --- UTILITY: Calculate Rank based on ELO ---
 const getRankFromElo = (elo) => {
   if (elo < 1200) return "Bronze";
@@ -146,7 +150,7 @@ const FriendsPage = () => {
   const [sortBy, setSortBy] = useState("elo");
   const [selectedFriend, setSelectedFriend] = useState(null);
 
-  // 1. Fetch Friends, Requests, and Outgoing
+  const { sendNotification } = useNotifications()
   useEffect(() => {
     const loadSocialData = async () => {
       if (!userData) return;
@@ -172,26 +176,22 @@ const FriendsPage = () => {
     if (activeTab === 'add') {
       const fetchTopPlayers = async () => {
         try {
-          // Fetch top 20 players by ELO
-          const q = query(collection(db, "users"), orderBy("elo", "desc"), limit(20));
+          const q = query(collection(db, "users"), orderBy("elo", "desc"), limit(50));
           const snapshot = await getDocs(q);
           const users = snapshot.docs
             .map(doc => {
               const data = doc.data();
-              // Filter out self and existing friends
+              const myFriends = userData?.friends || [];
               if (data.uid === userData?.uid) return null;
-              if (userData?.friends?.includes(data.uid)) return null;
+              if (myFriends.includes(data.uid)) return null;
 
               return {
                 id: doc.id,
-                avatarUrl: data.avatarUrl,
-                name: data.displayName,
-                handle: data.userHandle,
-                elo: data.elo,
+                ...data,
                 mutual: 0
               };
             })
-            .filter(u => u !== null);
+            .filter(u => u !== null).slice(0, 20);;
 
           setDiscoverUsers(users);
         } catch (e) {
@@ -201,10 +201,16 @@ const FriendsPage = () => {
       fetchTopPlayers();
     }
   }, [activeTab, userData]);
-  console.log(discoverUsers)
   const handleInvite = (friend, e) => {
     e.stopPropagation();
-    alert(`Invite sent to ${friend.name}`);
+    // console.log(friend)
+    try {
+      sendNotification(friend.id, `Let's have battle someday`, "challengeReceived")
+      toast.success(`Sent Invite to ${friend.name}`)
+      // console.log("working")
+    } catch (error) {
+      console.error(error)
+    }
   };
 
   const handleSpectate = (friend, e) => {
@@ -239,7 +245,7 @@ const FriendsPage = () => {
       alert(`You are now friends with ${req.name}!`);
       setIncomingReqs(prev => prev.filter(r => r.id !== friendUid));
       setFriendsList(prev => [...prev, { ...req, status: "Offline" }]);
-
+      sendNotification(friendUid, `You and ${userData.displayName} are Friends Now`, "acceptedFriendReq")
     } catch (error) {
       console.error("Error accepting friend request:", error);
       alert("Failed to accept friend request. Please try again.");
@@ -247,8 +253,6 @@ const FriendsPage = () => {
       setLoading(false);
     }
   };
-
-
 
   const handleIgnore = async (req) => {
     if (!userData || !req.id) return;
@@ -304,6 +308,7 @@ const FriendsPage = () => {
 
   const handleAddFriend = async (req) => {
     if (!userData || !req.id) return;
+
     try {
       setLoading(true);
       const myUid = userData.uid;
@@ -319,12 +324,13 @@ const FriendsPage = () => {
         incomingFriendReq: arrayUnion(myUid),
       })
       batch.commit()
-      alert(`Friend request sent to ${req.name}!`); // FIXED MSG
+      toast.success(`Friend request sent to ${req.name}!`);
       setOutgoingReqs(prev => [...prev, req]);
       setDiscoverUsers(prev => prev.filter(user => user.id !== friendUid));
+      sendNotification(friendUid, `${userData.displayName} Added You`, "sentFriendReq")
     } catch (error) {
       console.error("Error accepting friend request:", error);
-      alert("Failed to accept friend request. Please try again.");
+      toast.error("Failed to accept friend request. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -984,8 +990,6 @@ const RequestRow = ({ request, type, onAccept, onIgnore, onCancel }) => {
     </div>
   );
 };
-
-/* ---------- Add friends view ---------- */
 
 const AddFriendsView = ({ results, onAdd }) => {
   return (

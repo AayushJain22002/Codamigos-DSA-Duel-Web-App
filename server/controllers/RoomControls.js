@@ -1,30 +1,47 @@
-import { dataset } from "../../client/src/data/problems.js";
-import { rtdb } from "../firebaseAdmin.js";
+import { db, rtdb } from "../firebaseAdmin.js";
 import { generateRoomCode } from "../utils/generateRoomCode.js"
 
-// console.log(dataset[0])
-
-const pickRandomProblems = (count = 3) => {
-    const ids = dataset.map(p => p.id);
-    const selected = [];
-
-    while (selected.length < count) {
-        const rand = ids[Math.floor(Math.random() * ids.length)];
-        if (!selected.includes(rand)) selected.push(rand);
-    }
-    return selected;
-}
+const pickRandom = (arr, count) => {
+    if (!arr || arr.length === 0) return [];
+    const shuffled = [...arr].sort(() => 0.5 - Math.random());
+    return shuffled.slice(0, count);
+};
 
 export const createRoom = async (req, res) => {
-    const problems = pickRandomProblems(3);
     try {
         const { roomName, mode, difficulty, user } = req.body || {};
 
         if (!user || !user.uid) {
             return res.status(400).json({ ok: false, message: "User is required" });
         }
-        // const profile = await getUserProfile()
         let code;
+        const metaDoc = await db.collection('system').doc('metadata').get();
+        if (!metaDoc.exists) {
+            return res.status(500).json({
+                ok: false,
+                message: "System metadata missing. Please run 'node scripts/update-metadata.mjs'"
+            });
+        }
+        const idsData = metaDoc.data().problemIds;
+        let pool = [];
+        const selectedDiff = (difficulty || 'mixed').toLowerCase(); // normalize to lowercase
+
+        if (selectedDiff === 'easy') {
+            pool = idsData.easy;
+        } else if (selectedDiff === 'medium') {
+            pool = idsData.medium;
+        } else if (selectedDiff === 'hard') {
+            pool = idsData.hard;
+        } else {
+            pool = idsData.all;
+        }
+        if (!pool || pool.length === 0) {
+            console.warn(`Warning: No problems found for difficulty '${selectedDiff}'. Falling back to 'all'.`);
+            pool = idsData.all;
+        }
+
+        const selectedProblemIds = pickRandom(pool, 3);
+
         for (let attempt = 0; attempt < 5; attempt++) {
             const candidate = generateRoomCode();
             const snap = await rtdb.ref(`rooms/${candidate}`).get();
@@ -33,22 +50,16 @@ export const createRoom = async (req, res) => {
                 break;
             }
         }
-        if (!code) {
-            return res
-                .status(500)
-                .json({ ok: false, message: "Could not generate room code" });
-        }
-
+        if (!code) throw new Error("Could not generate room code");
         const now = Date.now();
-
         const room = {
             code,
             roomName: roomName || "Untitled Room",
             mode: mode || "dsa",
-            difficulty: difficulty || "mixed",
+            difficulty: selectedDiff,
             status: "waiting",
             createdAt: now,
-            problems,
+            problems: selectedProblemIds,
             activeProblem: 0,
             players: {
                 [user.uid]: {
@@ -61,7 +72,7 @@ export const createRoom = async (req, res) => {
             },
             state: {
                 currentProblemIndex: 0,
-                totalProblems: 4,
+                totalProblems: selectedProblemIds.length,
             },
         };
         await rtdb.ref(`rooms/${code}`).set(room);

@@ -1,5 +1,4 @@
 // Imports
-
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
     ResizableHandle,
@@ -17,7 +16,7 @@ import {
 import { Button } from '../../components/ui/button'
 import { BsChatRightTextFill } from "react-icons/bs";
 import { Input } from '../../components/ui/input'
-import { DoorOpen, Link, RotateCcw, Send, Terminal, Play, Loader2, PlayCircle, Lock, ListTodo, Check, LoaderPinwheel } from 'lucide-react';
+import { DoorOpen, Link, RotateCcw, Send, Terminal, Play, Loader2, PlayCircle, Lock, ListTodo, Check } from 'lucide-react';
 import {
     Tooltip,
     TooltipContent,
@@ -26,7 +25,7 @@ import {
 import { ScrollArea } from "../../components/ui/scroll-area"
 import { Separator } from '../../components/ui/separator'
 import { Badge } from '../../components/ui/badge'
-import { dataset } from '../data/problems';
+// REMOVED: import { dataset } from '../data/problems'; 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '../../components/ui/carousel'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
@@ -35,21 +34,20 @@ import { db, rtdb } from '../../firebase'
 import { get, ref, remove, onValue, push, update } from 'firebase/database'
 import { FaCrown, FaUser } from 'react-icons/fa'
 import { useAuth } from '../lib/AuthProvider'
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore'
+// ADDED: doc, getDoc to fetch specific problems
+import { addDoc, collection, serverTimestamp, doc, getDoc } from 'firebase/firestore' 
 import toast from 'react-hot-toast'
 import api from '../lib/api.js'
 import { Avatar, AvatarFallback, AvatarImage } from '../../components/ui/avatar.jsx'
-import { ButtonGroup, ButtonGroupSeparator } from '../../components/ui/button-group.jsx'
+import { ButtonGroup } from '../../components/ui/button-group.jsx'
 
 // Helper Functions
-
 const formatTime = (seconds) => {
     if (seconds <= 0) return "00:00";
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 };
-
 
 // Main Function
 const CodingArea = () => {
@@ -59,6 +57,7 @@ const CodingArea = () => {
 
     // --- State Management ---
     const [roomData, setRoomData] = useState(null)
+    const [problemsData, setProblemsData] = useState([]) // New State for fetched problems
     const [selectedLanguage, setSelectedLanguage] = useState('javascript');
     const [editorCode, setEditorCode] = useState("");
     const [messages, setMessages] = useState([]);
@@ -69,32 +68,7 @@ const CodingArea = () => {
     const [activeProblemId, setActiveProblemId] = useState(null);
     const [testResults, setTestResults] = useState([]);
 
-    // Problem Data
-    useEffect(() => {
-        if (roomData?.problems?.length > 0 && !activeProblemId) {
-            setActiveProblemId(roomData.problems[0]);
-        }
-    }, [roomData]);
-
-    const prob = useMemo(() => {
-        if (!activeProblemId) return null;
-        return dataset.find((p) => p.id === activeProblemId);
-    }, [activeProblemId]);
-
-    const testcases = useMemo(() => {
-        if (!prob || !prob.tests) return [];
-        return prob.tests.slice(0, 3);
-    }, [prob]);
-
-    useEffect(() => {
-        // Added 'prob' to the check
-        if (prob?.starterCode?.[selectedLanguage]) {
-            setEditorCode(prob.starterCode[selectedLanguage]);
-        } else {
-            setEditorCode("");
-        }
-    }, [selectedLanguage, prob])
-
+    // --- 1. Fetch Room Data & Sync ---
     useEffect(() => {
         if (!currentUser || !code) return;
 
@@ -112,7 +86,7 @@ const CodingArea = () => {
             const data = snapshot.val();
             setRoomData(data);
 
-            // Access Control: If room is ongoing and user is NOT in the player list, kick them.
+            // Access Control
             if (data.status === "ongoing" && (!data.players || !data.players[currentUser.uid])) {
                 toast.error("Match already in progress!");
                 navigate('/room');
@@ -132,48 +106,102 @@ const CodingArea = () => {
             unsubscribeChat();
         };
     }, [code, navigate, currentUser]);
-    const scrollRef = useRef(null);
 
+    // --- 2. NEW: Fetch Specific Problems from Firestore ---
+    useEffect(() => {
+        // Only run if we have roomData and haven't fetched problems yet
+        if (roomData?.problems && problemsData.length === 0) {
+            const fetchProblems = async () => {
+                try {
+                    // Create an array of promises to fetch only the 3 IDs in roomData.problems
+                    const promises = roomData.problems.map(id => getDoc(doc(db, "problems", id)));
+                    
+                    const snapshots = await Promise.all(promises);
+                    
+                    // Map snapshots to data
+                    const fetched = snapshots.map(snap => {
+                        if (snap.exists()) {
+                            return { id: snap.id, ...snap.data() };
+                        }
+                        return null;
+                    }).filter(item => item !== null);
+
+                    setProblemsData(fetched);
+
+                    // Set active problem if not set
+                    if (!activeProblemId && fetched.length > 0) {
+                        setActiveProblemId(fetched[0].id);
+                    }
+                } catch (error) {
+                    console.error("Error fetching problems:", error);
+                    toast.error("Failed to load problems");
+                }
+            };
+            fetchProblems();
+        }
+    }, [roomData, problemsData.length, activeProblemId]);
+
+    // --- 3. Logic based on fetched data ---
+    
+    // Updated: Use problemsData instead of dataset
+    const prob = useMemo(() => {
+        if (!activeProblemId || problemsData.length === 0) return null;
+        return problemsData.find((p) => p.id === activeProblemId);
+    }, [activeProblemId, problemsData]);
+
+    const testcases = useMemo(() => {
+        // Updated: Check for 'samples' or 'testCases' based on your DB structure
+        // Assuming your DB has 'samples' for public view
+        if (!prob || !prob.samples) return [];
+        return prob.samples.slice(0, 3);
+    }, [prob]);
+
+    // Reset editor when problem or language changes
+    useEffect(() => {
+        // Safe check for languages
+        if (prob?.languages?.[selectedLanguage]?.starterCode) {
+            setEditorCode(prob.languages[selectedLanguage].starterCode);
+        } else if (prob?.starterCode?.[selectedLanguage]) {
+             // Fallback if your DB structure is flat
+            setEditorCode(prob.starterCode[selectedLanguage]);
+        } else {
+            setEditorCode("");
+        }
+    }, [selectedLanguage, prob]);
+
+
+    // Chat Auto Scroll
+    const scrollRef = useRef(null);
     useEffect(() => {
         if (scrollRef.current) {
             scrollRef.current.scrollIntoView({ behavior: "smooth" });
         }
     }, [messages]);
 
+    // Timer Logic
     useEffect(() => {
         let interval;
-
         if (roomData?.status === "ongoing" && roomData?.startTime) {
-            // Function to calculate remaining time based on Server Start Time
             const updateTimer = () => {
                 const now = Date.now();
                 const elapsedSeconds = (now - roomData.startTime) / 1000;
                 const remaining = (45 * 60) - elapsedSeconds;
                 setTimeLeft(remaining > 0 ? remaining : 0);
             };
-
-            updateTimer(); // Initial call
+            updateTimer(); 
             interval = setInterval(updateTimer, 1000);
         } else {
-            // If not started, reset to 45 mins
             setTimeLeft(45 * 60);
         }
-
         return () => {
             if (interval) clearInterval(interval);
         }
     }, [roomData?.status, roomData?.startTime]);
 
-    useEffect(() => {
-        if (prob?.starterCode?.[selectedLanguage]) {
-            setEditorCode(prob.starterCode[selectedLanguage]);
-        }
-    }, [selectedLanguage]);
 
     const handleEditorChange = (value) => {
         setEditorCode(value || "");
     }
-
 
     const handleSendMessage = async () => {
         if (!chatInput.trim()) return;
@@ -187,15 +215,14 @@ const CodingArea = () => {
         setChatInput("");
     };
 
-    const [submissionToken, setSubmissionToken] = useState("")
     const handleRunCode = async () => {
         setIsRunning(true);
-        setTestResults([]); // Clear previous results
+        setTestResults([]);
 
         const lang = languages.find((lang) => lang.value === selectedLanguage);
-        const lang_id = lang ? lang.languageCode : 63; // Default JS
+        const lang_id = lang ? lang.languageCode : 63;
 
-        // 1. Prepare Batch Submissions
+        // Use testcases derived from the fetched problem
         const submissions = testcases.map((testCase) => ({
             language_id: lang_id,
             source_code: editorCode,
@@ -203,13 +230,12 @@ const CodingArea = () => {
             expected_output: testCase.output
         }));
 
+        const functionName = prob.functionName;
         try {
-            const res = await api.post('/api/judge0/run-code/batch', { submissions });
+            const res = await api.post('/api/judge0/run-code/batch', { submissions, functionName });
             const rawData = Array.isArray(res.data) ? res.data : [res.data];
             const tokens = rawData.map(t => t.token);
-
             await checkBatchStatus(tokens);
-
         } catch (error) {
             console.error(error);
             toast.error("Execution failed to start");
@@ -219,25 +245,18 @@ const CodingArea = () => {
 
     const checkBatchStatus = async (tokens) => {
         const tokenString = tokens.join(',');
-
         try {
-            // Call your backend which calls Judge0: GET /submissions/batch?tokens=...&fields=token,stdout,stderr,status_id,compile_output
             const res = await api.get(`/api/judge0/check-batch?tokens=${tokenString}`);
-            const results = res.data.submissions; // Assuming Judge0 structure
-
-            // Status ID 1 or 2 means In Queue/Processing. >= 3 means Done.
+            const results = res.data.submissions;
             const isPending = results.some(r => r.status.id <= 2);
 
             if (isPending) {
-                // Keep polling after 2 seconds
                 setTimeout(() => checkBatchStatus(tokens), 2000);
             } else {
-                // All done! Update state
                 setTestResults(results);
+                console.log(results)
                 setIsRunning(false);
-
-                // Optional: Show toast summary
-                const passed = results.filter(r => r.status.id === 3).length; // 3 = Accepted
+                const passed = results.filter(r => r.status.id === 3).length;
                 if (passed === results.length) toast.success("All Test Cases Passed!");
                 else toast.error(`${results.length - passed} Test Cases Failed`);
             }
@@ -250,8 +269,8 @@ const CodingArea = () => {
 
     const handleSubmitCode = async () => {
         console.log("Submited")
+        // Implement full submission logic here
     }
-
 
     const handleStartMatch = async () => {
         const roomRef = ref(rtdb, `rooms/${code}`);
@@ -269,18 +288,14 @@ const CodingArea = () => {
 
     const handleLeave = async () => {
         if (!currentUser) return;
-
         const roomRef = ref(rtdb, `rooms/${code}`);
         const playerRef = ref(rtdb, `rooms/${code}/players/${currentUser.uid}`);
-
         try {
             const snapshot = await get(roomRef);
-
             if (!snapshot.exists()) {
                 navigate(`/room`);
                 return;
             }
-
             const currentRoomData = snapshot.val();
             const isHost = currentRoomData?.players?.[currentUser.uid]?.isHost;
 
@@ -291,18 +306,16 @@ const CodingArea = () => {
                     roomId: code,
                     archivedAt: serverTimestamp()
                 });
-
                 await remove(roomRef);
                 toast.success("Room archived and closed.");
             } else {
-                // Guest: Just remove self
                 await remove(playerRef);
                 toast.success("You left the room.");
             }
             navigate(`/room`);
         } catch (error) {
             console.error("Error leaving room:", error);
-            toast.error("Error processing request. Check console.");
+            toast.error("Error processing request.");
         }
     }
 
@@ -324,38 +337,38 @@ const CodingArea = () => {
         padding: { top: 16 }
     };
 
-    // Determine if current user is host
     const isHost = roomData?.players?.[currentUser?.uid]?.isHost;
+
+    // Loading State
     if (!roomData || !prob) {
         return (
             <div className="h-screen w-full flex flex-col items-center justify-center gap-4 bg-background">
                 <Loader2 className="animate-spin h-10 w-10 text-primary" />
-                <p className="text-muted-foreground animate-pulse">Loading Room & Problem...</p>
+                <p className="text-muted-foreground animate-pulse">Loading Room & Problems...</p>
             </div>
         )
     }
+
     return (
         <div className='h-screen flex flex-col bg-background'>
-
             <ResizablePanelGroup direction="horizontal" className="w-full h-full">
-
 
                 <ResizablePanel defaultSize={40} minSize={25} maxSize={45}>
                     <ResizablePanelGroup direction="vertical" className="w-full h-full">
+                        {/* PROBLEM DESCRIPTION */}
                         <ResizablePanel defaultSize={80} minSize={60}>
                             <ScrollArea className="w-full h-full px-2 bg-accent/10">
                                 <div className='p-4 flex flex-col gap-4'>
                                     <div className='flex justify-between items-start'>
                                         <div className='w-full'>
                                             <div className='flex justify-between'>
-
                                                 <h1 className='font-bold text-2xl tracking-tight '>{prob.title}</h1>
                                                 <Badge variant={prob.difficulty} className="h-fit py-2 px-5">
                                                     {prob.difficulty}
                                                 </Badge>
                                             </div>
                                             <div className='flex gap-2 mt-2'>
-                                                {prob.tags.map((tag) => (
+                                                {prob.tags && prob.tags.map((tag) => (
                                                     <Badge key={tag} variant="outline" className="capitalize text-xs">{tag}</Badge>
                                                 ))}
                                             </div>
@@ -371,7 +384,7 @@ const CodingArea = () => {
                                     <div>
                                         <h2 className='font-semibold text-lg mb-2'>Examples</h2>
                                         <div className='flex flex-col gap-4'>
-                                            {prob.samples.map((sample, index) => (
+                                            {prob.samples && prob.samples.map((sample, index) => (
                                                 <div key={index} className='bg-muted/50 rounded-lg p-3 border text-sm'>
                                                     <div className='font-mono font-bold mb-1'>Input:</div>
                                                     <div className='bg-background p-2 rounded border mb-2 font-mono'>{sample.input}</div>
@@ -387,7 +400,7 @@ const CodingArea = () => {
                                     <div>
                                         <h2 className='font-semibold text-lg mb-2'>Constraints</h2>
                                         <ul className='list-disc list-inside text-sm text-muted-foreground'>
-                                            {prob.constraints.map((c, i) => <li key={i}>{c}</li>)}
+                                            {prob.constraints && prob.constraints.map((c, i) => <li key={i}>{c}</li>)}
                                         </ul>
                                     </div>
                                 </div>
@@ -395,10 +408,11 @@ const CodingArea = () => {
                         </ResizablePanel>
 
                         <ResizableHandle withHandle />
+                        
+                        {/* PROBLEM LIST (Sidebar) */}
                         <ResizablePanel defaultSize={30} minSize={20} collapsible>
                             <ScrollArea className="h-full bg-muted/5">
                                 <div className="p-4 flex flex-col gap-4">
-
                                     {/* Header */}
                                     <div className="flex items-center justify-between px-1">
                                         <div className="flex items-center gap-2">
@@ -408,29 +422,20 @@ const CodingArea = () => {
                                             </h3>
                                         </div>
                                         <Badge variant="secondary" className="px-2 h-5 text-[10px] font-mono bg-primary/10 text-primary hover:bg-primary/20 border-primary/20">
-                                            {roomData?.problems?.length || 0}
+                                            {problemsData.length}
                                         </Badge>
                                     </div>
 
-                                    {/* Problem List */}
+                                    {/* Problem List Items */}
                                     <div className="flex flex-col gap-2.5">
-                                        {roomData?.problems?.map((id, index) => {
-                                            // Find details from dataset
-                                            const details = dataset.find(p => p.id === id);
-                                            if (!details) return null;
-
-                                            const isActive = activeProblemId === id;
-
-                                            // Helper for dynamic colors without changing logic structure
-                                            const diffColor =
-                                                details.difficulty === 'Easy' ? 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20' :
-                                                    details.difficulty === 'Medium' ? 'text-amber-500 bg-amber-500/10 border-amber-500/20' :
-                                                        'text-rose-500 bg-rose-500/10 border-rose-500/20';
+                                        {problemsData.map((details, index) => {
+                                            // Mapping through fetched problemsData
+                                            const isActive = activeProblemId === details.id;
 
                                             return (
                                                 <div
-                                                    key={id}
-                                                    onClick={() => setActiveProblemId(id)}
+                                                    key={details.id}
+                                                    onClick={() => setActiveProblemId(details.id)}
                                                     className={`
                                 group relative flex flex-col gap-2 rounded-lg border p-3 text-left transition-all duration-200 cursor-pointer
                                 hover:border-primary/50 hover:shadow-sm
@@ -440,7 +445,6 @@ const CodingArea = () => {
                                                         }
                             `}
                                                 >
-                                                    {/* Active Indicator Strip */}
                                                     {isActive && (
                                                         <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-primary rounded-l-lg" />
                                                     )}
@@ -455,8 +459,6 @@ const CodingArea = () => {
                                                                     {details.title}
                                                                 </span>
                                                             </div>
-
-                                                            {/* Tags Row */}
                                                             <div className="flex items-center gap-2">
                                                                 {details.tags?.[0] && (
                                                                     <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-muted font-medium text-muted-foreground capitalize">
@@ -465,8 +467,6 @@ const CodingArea = () => {
                                                                 )}
                                                             </div>
                                                         </div>
-
-                                                        {/* Difficulty Badge */}
                                                         <Badge variant={details.difficulty}>
                                                             {details.difficulty}
                                                         </Badge>
@@ -661,17 +661,10 @@ const CodingArea = () => {
                                         <BsChatRightTextFill /> Chat Room
                                     </Button>
                                 </SheetTrigger>
-
-                                {/* KEY FIXES:
-                   1. h-full: Forces sheet to fill screen height.
-                   2. flex flex-col: Enables vertical stacking.
-                   3. overflow-hidden: Prevents double scrollbars.
-                */}
                                 <SheetContent
                                     side="right"
                                     className="flex flex-col h-full w-full sm:w-[450px] p-0 gap-0 border-l bg-gray-50 dark:bg-zinc-900"
                                 >
-                                    {/* --- HEADER --- */}
                                     <SheetHeader className="px-4 py-3 border-b bg-white dark:bg-zinc-950 shadow-sm z-10">
                                         <SheetTitle className="flex items-center gap-2 text-base font-bold">
                                             <div className="p-2 bg-primary/10 rounded-full">
@@ -697,7 +690,6 @@ const CodingArea = () => {
                                                         key={i}
                                                         className={`flex w-full gap-2 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}
                                                     >
-                                                        {/* Avatar Bubble */}
                                                         <Avatar className="h-8 w-8 mt-1 border">
                                                             <AvatarImage src={`/avatars/${userData?.avatarurl}`} />
                                                             <AvatarFallback className="text-[10px] font-bold">
@@ -706,7 +698,6 @@ const CodingArea = () => {
                                                         </Avatar>
 
                                                         <div className={`flex flex-col max-w-[75%] ${isMe ? 'items-end' : 'items-start'}`}>
-                                                            {/* Name & Time */}
                                                             <div className="flex items-center gap-2 mb-1 px-1">
                                                                 <span className="text-[11px] font-semibold text-muted-foreground">
                                                                     {isMe ? "You" : msg.sender}
@@ -716,7 +707,6 @@ const CodingArea = () => {
                                                                 </span>
                                                             </div>
 
-                                                            {/* Message Bubble */}
                                                             <div
                                                                 className={`
                                                     px-3 py-2 text-sm shadow-sm wrap-break-word leading-relaxed
@@ -733,13 +723,9 @@ const CodingArea = () => {
                                                 );
                                             })
                                         )}
-                                        {/* Dummy div to scroll into view */}
                                         <div ref={scrollRef} className="pt-2" />
                                     </div>
 
-                                    {/* --- FOOTER / INPUT --- 
-                        Stays stuck to bottom because of flex layout
-                    */}
                                     <div className="p-4 bg-white dark:bg-zinc-950 border-t">
                                         <form
                                             onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }}
@@ -762,7 +748,6 @@ const CodingArea = () => {
                                             </Button>
                                         </form>
                                     </div>
-
                                 </SheetContent>
                             </Sheet>
                         </div>

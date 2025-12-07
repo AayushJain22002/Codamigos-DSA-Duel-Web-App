@@ -20,11 +20,13 @@ import { Button } from "../../components/ui/button";
 import { FaGoogle } from "react-icons/fa6";
 import toast, { Toaster } from "react-hot-toast";
 import { useAuth } from "../lib/AuthProvider";
+import { useNotifications } from "../utils/useNotifications";
 
 const LoginSignup = () => {
   const navigate = useNavigate();
   const { login, signup, signInWithGoogle } = useAuth();
   const { currentUser } = useAuth()
+  const {sendNotification} = useNotifications();
   // redirect if already logged in
   useEffect(() => {
     if (currentUser) {
@@ -44,7 +46,8 @@ const LoginSignup = () => {
     try {
       await login(loginEmail, loginPassword);
       toast.success("Logged in successfully!");
-      navigate("/"); // optional: redirect after login
+      
+      navigate("/");
     } catch (err) {
       console.error(err);
       toast.error(err?.message || "Login failed");
@@ -65,6 +68,7 @@ const LoginSignup = () => {
     try {
       await signup(signupEmail, signupPassword);
       toast.success("Account created!");
+     
       navigate("/onboarding");
     } catch (err) {
       console.error(err);

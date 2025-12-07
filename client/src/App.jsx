@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { ThemeProvider } from "../components/theme-provider";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import Home from "./pages/Home";
@@ -16,6 +16,7 @@ import MyAmigos from "./pages/MyAmigos.jsx";
 import Leaderboard from "./pages/Leaderboard.jsx";
 
 const App = () => {
+
   const isMobile = () => {
     return window.matchMedia("(max-width: 568px)").matches; 
   };
