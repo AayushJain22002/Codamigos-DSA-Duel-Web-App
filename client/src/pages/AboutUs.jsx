@@ -96,7 +96,7 @@ const AboutUs = () => {
     <div className='relative w-full min-h-screen bg-background overflow-hidden'>
 
       {/* Cool Background Effects (Grid + Spotlight) */}
-      <div className="absolute inset-0 -z-10 h-full w-full bg-background bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:14px_24px]">
+      <div className="absolute inset-0 -z-10 h-full w-full bg-background bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-size-[14px_24px]">
         <div className="absolute left-0 right-0 top-0 -z-10 m-auto h-[310px] w-[310px] rounded-full bg-primary/20 opacity-20 blur-[100px]"></div>
       </div>
 
@@ -113,7 +113,7 @@ const AboutUs = () => {
 
         {/* Headline */}
         <div className='text-center max-w-5xl w-full mt-4 space-y-2 animate-in fade-in slide-in-from-bottom-6 duration-1000 delay-100'>
-          <h1 className='text-5xl md:text-7xl lg:text-8xl font-bold tracking-tighter bg-gradient-to-b from-foreground to-foreground/50 bg-clip-text text-transparent'>
+          <h1 className='text-5xl md:text-7xl lg:text-8xl font-bold tracking-tighter bg-linear-to-b from-foreground to-foreground/50 bg-clip-text text-transparent'>
             Discover Our Mission to <br className="hidden md:block" />
             <span className="text-primary">Gamify</span> the Experience.
           </h1>
@@ -163,7 +163,7 @@ const AboutUs = () => {
                       <Card className="bg-card/40 backdrop-blur-sm border-white/10 hover:border-primary/50 transition-all duration-500 hover:shadow-[0_0_30px_-15px_rgba(var(--primary-rgb),0.5)] group h-full overflow-hidden relative">
 
                         {/* Subtle background gradient splash on hover */}
-                        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 -z-10" />
+                        <div className="absolute inset-0 bg-linear-to-br from-primary/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 -z-10" />
 
                         <CardContent className="flex flex-col items-start justify-between p-8 h-full min-h-[280px] gap-6">
 
@@ -207,7 +207,7 @@ const AboutUs = () => {
             <div className="space-y-4">
               <h1 className='text-5xl md:text-6xl font-bold tracking-tighter text-white leading-[1.1]'>
                 The Ultimate Arena for <br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#ffdd00] to-amber-700">
+                <span className="text-transparent bg-clip-text bg-linear-to-r from-[#ffdd00] to-amber-700">
                   Developers
                 </span>
               </h1>
@@ -250,7 +250,7 @@ const AboutUs = () => {
                   alt="Platform Screenshot"
                 />
                 {/* Fade overlay at the bottom to blend image into the card edge */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent rounded-t-2xl pointer-events-none"></div>
+                <div className="absolute inset-0 bg-linear-to-t from-black/20 to-transparent rounded-t-2xl pointer-events-none"></div>
               </div>
             </div>
           </div>
@@ -443,12 +443,12 @@ const AboutUs = () => {
             {teamData.map((member) => (
               // 1. Main Card Container: Relative positioning is key here. Added specific height.
               <div
-                className="relative w-full max-w-[350px] h-[450px] mx-auto bg-neutral-900 rounded-[2rem] overflow-hidden shadow-2xl border border-neutral-800 group"
+                className="relative w-full max-w-[350px] h-[450px] mx-auto bg-neutral-900 rounded-4xl overflow-hidden shadow-2xl border border-neutral-800 group"
                 key={member.id}
               >
                 {/* 2. Image Container */}
                 <div className="w-full h-full relative">
-                  <div className="absolute inset-0 bg-gradient-to-t from-neutral-900 via-transparent to-transparent z-10 pointer-events-none"></div>
+                  <div className="absolute inset-0 bg-linear-to-t from-neutral-900 via-transparent to-transparent z-10 pointer-events-none"></div>
                   <img
                     src={member.image}
                     alt={member.name}
