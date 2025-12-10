@@ -52,6 +52,7 @@ const App = () => {
             <Route path="myamigos" element={<MyAmigos />} />
             <Route path="/room/:code" element={<CodingArea />} />
             <Route path="/room" element={<RoomPage />} />
+            <Route path="/redeem/shop" element={<Shop />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
