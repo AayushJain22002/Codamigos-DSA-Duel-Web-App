@@ -125,7 +125,6 @@ const CodingArea = () => {
                     const promises = roomData.problems.map(id => getDoc(doc(db, "problems", id)));
                     const snapshots = await Promise.all(promises);
                     const fetched = snapshots.map(snap => snap.exists() ? ({ id: snap.id, ...snap.data() }) : null).filter(Boolean);
-                    // attach solved flag from RTDB if present in roomData.problemsSolved OR default false
                     const withSolved = fetched.map(p => ({
                         ...p,
                         solved: !!(roomData.problemsSolved && roomData.problemsSolved[p.id])
@@ -141,7 +140,6 @@ const CodingArea = () => {
         }
     }, [roomData, problemsData.length, activeProblemId]);
 
-    // --- memo current problem & testcases ---
     const prob = useMemo(() => {
         if (!activeProblemId || problemsData.length === 0) return null;
         return problemsData.find((p) => p.id === activeProblemId) || null;

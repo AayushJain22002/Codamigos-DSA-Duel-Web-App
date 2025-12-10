@@ -15,6 +15,7 @@ const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [userData, setUserData] = useState(null);
+  const [loading, setLoading] = useState(true);
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
@@ -22,16 +23,23 @@ export const AuthProvider = ({ children }) => {
         try {
           const userDocRef = doc(db, "users", user.uid);
           const userDocSnap = await getDoc(userDocRef);
-          if (userDocSnap.exists()) { 
+          if (userDocSnap.exists()) {
             // console.log("User document found!");
-            setUserData(userDocSnap.data()); 
+            setUserData(userDocSnap.data());
           } else {
             console.warn("No user document found in Firestore for UID:", user.uid);
             setUserData(null);
           }
         } catch (error) {
           console.log(error);
+        } finally {
+          // 2. Set loading to false ONLY after the async Firestore fetch is done
+          setLoading(false);
         }
+      } else {
+        // 3. If no user, we are done loading immediately
+        setUserData(null);
+        setLoading(false);
       }
     });
     return unsubscribe;
@@ -61,7 +69,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const value = { currentUser, userData, logout, login, signup, signInWithGoogle };
+  const value = { currentUser, userData, loading, logout, login, signup, signInWithGoogle };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
