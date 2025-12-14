@@ -99,6 +99,7 @@ export const joinRoom = async (req, res) => {
         }
 
         const room = snap.val()
+
         if (room.status !== 'waiting') {
             return res
                 .status(400)

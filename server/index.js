@@ -5,6 +5,7 @@ import http from 'http';
 import RoomRoutes from './routes/RoomRoute.js';
 import judgeRoute from './routes/JudgeRoutes.js';
 import userRoutes from './routes/UserRoutes.js';
+import matchRoutes from './routes/matchRoutes.js';
 
 // Constants
 const PORT = process.env.PORT || 4000;
@@ -19,7 +20,7 @@ const server = http.createServer(app)
 const io = new Server(server, {
     cors: {
         origin: "http://localhost:5173",
-        methods: ["GET", "POST"]
+        methods: ["GET", "POST", "DELETE"]
     }
 });
 //Routes
@@ -29,6 +30,7 @@ app.get("/", (req, res) => {
 
 app.use('/api/rooms', RoomRoutes)
 app.use('/api/judge0', judgeRoute)
+app.use('/api/match', matchRoutes);
 app.use('/api/users', userRoutes)
 //Socket.io
 io.on("connection", (socket) => {

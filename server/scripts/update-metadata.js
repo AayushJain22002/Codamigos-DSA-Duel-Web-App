@@ -22,42 +22,104 @@ if (!admin.apps.length) {
 }
 const db = admin.firestore();
 
-// 2. LOGIC: Group IDs by difficulty
+// 2. LOGIC: Update Metadata (Problems + Users + Leaderboard)
 async function updateMetadata() {
-    console.log("🔍 Scanning 'problems' collection...");
-    
-    const snapshot = await db.collection('problems').get();
-    
-    const easy = [];
-    const medium = [];
-    const hard = [];
-    const all = [];
+    try {
+        const timestamp = new Date().toISOString();
+        console.log(`[${timestamp}] 🚀 Starting Metadata Update...`);
 
-    snapshot.forEach(doc => {
-        const id = doc.id;
-        const data = doc.data();
-        const diff = (data.difficulty || 'easy').toLowerCase();
+        // --- PART A: PROBLEMS METADATA ---
+        console.log("🔍 Scanning 'problems' collection...");
+        const problemSnapshot = await db.collection('problems').get();
+        
+        const easy = [];
+        const medium = [];
+        const hard = [];
+        const allProblems = [];
 
-        all.push(id);
-        if (diff === 'easy') easy.push(id);
-        else if (diff === 'medium') medium.push(id);
-        else if (diff === 'hard') hard.push(id);
-    });
+        problemSnapshot.forEach(doc => {
+            const id = doc.id;
+            const data = doc.data();
+            const diff = (data.difficulty || 'easy').toLowerCase();
 
-    // 3. SAVE: Write to 'system/metadata'
-    await db.collection('system').doc('metadata').set({
-        problemIds: {
-            all,
-            easy,
-            medium,
-            hard
-        },
-        totalCount: all.length,
-        lastUpdated: admin.firestore.FieldValue.serverTimestamp()
-    });
+            allProblems.push(id);
+            if (diff === 'easy') easy.push(id);
+            else if (diff === 'medium') medium.push(id);
+            else if (diff === 'hard') hard.push(id);
+        });
 
-    console.log(`✅ Success! Metadata updated.`);
-    console.log(`📊 Stats: All: ${all.length} | Easy: ${easy.length} | Medium: ${medium.length} | Hard: ${hard.length}`);
+        // --- PART B: USERS METADATA & LEADERBOARD ---
+        console.log("🔍 Scanning 'users' collection...");
+        const userSnapshot = await db.collection('users').get();
+        
+        let allUsersRaw = [];
+        let totalElo = 0;
+        let usersWithElo = 0;
+
+        userSnapshot.forEach(doc => {
+            const data = doc.data();
+            const elo = typeof data.elo === 'number' ? data.elo : 1200;
+
+            // Stats Aggregation
+            totalElo += elo;
+            usersWithElo++;
+
+            // Collect only necessary data for sorting/display
+            allUsersRaw.push({
+                uid: doc.id,
+                username: data.username || data.name || "Anonymous",
+                photoURL: data.avatarUrl || null,
+                elo: elo,
+                gamesPlayed: data.gamesPlayed || 0,
+                wins: data.wins || 0
+            });
+        });
+
+        const avgElo = usersWithElo > 0 ? Math.round(totalElo / usersWithElo) : 1200;
+
+        // Sort by Elo descending for Leaderboard
+        allUsersRaw.sort((a, b) => b.elo - a.elo);
+        
+        // Take Top 100 for the Leaderboard
+        const top100Leaderboard = allUsersRaw.slice(0, 100);
+
+        // --- PART C: SAVE EVERYTHING ---
+        const payload = {
+            // 1. Problem Metadata
+            problemIds: {
+                all: allProblems,
+                easy,
+                medium,
+                hard
+            },
+            totalProblemsCount: allProblems.length,
+
+            // 2. User Stats (Aggregated)
+            usersSummary: {
+                totalCount: allUsersRaw.length,
+                avgElo: avgElo
+            },
+
+            // 3. The Leaderboard (Top 100)
+            leaderboard: top100Leaderboard,
+
+            // 4. System Info
+            lastUpdated: admin.firestore.FieldValue.serverTimestamp()
+        };
+
+        // Write to 'system/metadata' (using merge: true to be safe, though set is fine too)
+        await db.collection('system').doc('metadata').set(payload, { merge: true });
+
+        console.log(`✅ Success! Metadata updated.`);
+        console.log(`📊 Problems: ${allProblems.length} (Easy: ${easy.length}, Med: ${medium.length}, Hard: ${hard.length})`);
+        console.log(`🏆 Users:    ${allUsersRaw.length} total. Leaderboard updated with Top ${top100Leaderboard.length}.`);
+        
+        process.exit(0);
+
+    } catch (error) {
+        console.error("❌ Failed to update metadata:", error);
+        process.exit(1);
+    }
 }
 
 updateMetadata();

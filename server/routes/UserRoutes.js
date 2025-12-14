@@ -1,58 +1,97 @@
-import Router from 'express'
-import { db } from '../firebaseAdmin';
+import admin from 'firebase-admin';
+import { db } from '../firebaseAdmin.js'
+import { Router } from 'express';
+import verifyToken from '../middleware/authMiddleware.js';
+
 const userRoutes = Router()
-// POST /check-in
-userRoutes.post("/check-in", async (req, res) => {
+
+userRoutes.post("/check-in", verifyToken, async (req, res) => {
     try {
-        const uid = req.user.uid; // you already attach req.user in your auth middleware
+        const uid = req.user.uid;
         const userRef = db.collection("users").doc(uid);
 
-        await db.runTransaction(async (tx) => {
+        // We return the result FROM the transaction to avoid a second DB read
+        const result = await db.runTransaction(async (tx) => {
             const snap = await tx.get(userRef);
             if (!snap.exists) throw new Error("User not found");
 
             const user = snap.data();
+
+            // 1. Handle Dates safely
             const now = new Date();
-            const todayStr = now.toDateString();
+            const lastCheckTimestamp = user.lastCheckInDate;
+            // Convert Firestore Timestamp to JS Date, or null if it doesn't exist
+            const lastCheckDate = lastCheckTimestamp ? lastCheckTimestamp.toDate() : null;
 
-            const lastCheck = user.lastCheckInDate?.toDate?.() || null;
-            const lastStr = lastCheck ? lastCheck.toDateString() : null;
+            // 2. Check if already checked in TODAY (Calendar Date comparison)
+            if (lastCheckDate) {
+                if (
+                    lastCheckDate.getDate() === now.getDate() &&
+                    lastCheckDate.getMonth() === now.getMonth() &&
+                    lastCheckDate.getFullYear() === now.getFullYear()
+                ) {
+                    // Stop transaction and return a specific flag
+                    return { alreadyCheckedIn: true, user };
+                }
+            }
 
-            // If already checked in today → do nothing (idempotent)
-            if (todayStr === lastStr) return;
-
-            // ---------- ACTUAL STREAK LOGIC ----------
+            // 3. STREAK LOGIC (Calendar Day Logic)
             let newCurrent = 1;
-            if (lastCheck) {
-                const diff = now - lastCheck;
-                const oneDay = 24 * 60 * 60 * 1000;
 
-                // If yesterday → streak continues
-                if (diff > oneDay && diff <= oneDay * 2) {
+            if (lastCheckDate) {
+                // Create a date object for "Yesterday"
+                const yesterday = new Date(now);
+                yesterday.setDate(now.getDate() - 1);
+
+                // Check if last check-in was specifically on "Yesterday"
+                const isYesterday =
+                    lastCheckDate.getDate() === yesterday.getDate() &&
+                    lastCheckDate.getMonth() === yesterday.getMonth() &&
+                    lastCheckDate.getFullYear() === yesterday.getFullYear();
+
+                if (isYesterday) {
                     newCurrent = (user.streak?.current || 0) + 1;
                 }
             }
 
             const newBest = Math.max(user.streak?.best || 0, newCurrent);
+            const newCoins = (user.coins || 0) + 10;
 
-            // ---------- UPDATE FIELDS ----------
+            // 4. Update
             tx.update(userRef, {
                 "streak.current": newCurrent,
                 "streak.best": newBest,
                 "streak.lastActivityDate": admin.firestore.FieldValue.serverTimestamp(),
-                coins: (user.coins || 0) + 10,
+                coins: newCoins,
                 lastCheckInDate: admin.firestore.FieldValue.serverTimestamp(),
             });
+
+            // Return the NEW values so we don't have to query DB again
+            return {
+                alreadyCheckedIn: false,
+                coins: newCoins,
+                streak: {
+                    current: newCurrent,
+                    best: newBest
+                }
+            };
         });
 
-        // Fetch updated data to return to client
-        const updated = (await db.collection("users").doc(uid).get()).data();
+        // Handle the result from the transaction
+        if (result.alreadyCheckedIn) {
+            return res.json({
+                success: true,
+                already: true,
+                coins: result.user.coins,
+                streak: result.user.streak
+            });
+        }
 
         return res.json({
             success: true,
             already: false,
-            coins: updated.coins,
-            streak: updated.streak,
+            coins: result.coins,
+            streak: result.streak,
         });
 
     } catch (err) {
@@ -63,7 +102,5 @@ userRoutes.post("/check-in", async (req, res) => {
         });
     }
 });
-
-// userRoutes.delete('/delete-code', deleteCode)
 
 export default userRoutes

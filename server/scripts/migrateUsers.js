@@ -64,7 +64,21 @@ async function migrateUsers() {
 
     // 6) Coins system
     if (user.coins === undefined) updatedData.coins = 0;
+    if (!user.email) {
+      try {
+        const userRecord = await admin.auth().getUser(doc.id);
 
+        if (userRecord.email) {
+          updatedData.email = userRecord.email;
+        } else {
+          updatedData.email = `missing_email_${doc.id}@placeholder.com`;
+        }
+      } catch (error) {
+    
+        console.warn(`User ${doc.id} not found in Auth system.`);
+        updatedData.email = `orphan_${doc.id}@placeholder.com`;
+      }
+    }
     // 7) Solved Problems
     if (!user.solvedProblems) {
       updatedData.solvedProblems = {
