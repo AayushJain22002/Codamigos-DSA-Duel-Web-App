@@ -22,9 +22,9 @@ const Footer = () => {
               The ultimate real-time arena for developers. Compete, rank up, and master algorithms together.
             </p>
             <div className="flex gap-4">
-              <SocialIcon icon={<FaGithub  size={20} />} href="#" />
-              <SocialIcon icon={<BsTwitterX  size={20} />} href="#" />
-              <SocialIcon icon={<FaLinkedin  size={20} />} href="#" />
+              <SocialIcon icon={<FaGithub  size={20} />} href="https://github.com/AkshatRaval/" />
+              <SocialIcon icon={<BsTwitterX  size={20} />} href="https://x.com/AkshatRaval8" />
+              <SocialIcon icon={<FaLinkedin  size={20} />} href="https://linkedin.com/in/akshatraval2486" />
             </div>
           </div>
 
