@@ -110,6 +110,7 @@ const OnBoarding = () => {
           displayName: formData.displayName.trim(),
           userHandle: rawHandle.startsWith("@") ? rawHandle : `@${rawHandle}`,
           handleLower,
+          email: currentUser.email,
           avatarUrl: avatarFile,
           bio: formData.bio.trim(),
           role: "user",
@@ -122,7 +123,7 @@ const OnBoarding = () => {
           wins: 0,
           losses: 0,
           streak: { current: 0, best: 0, lastActivityDate: serverTimestamp() },
-          coins: 0, 
+          coins: 0,
           solvedProblems: { total: 0, easy: 0, medium: 0, hard: 0 },
           socials: {
             github: formData.github.trim(),

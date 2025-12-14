@@ -16,6 +16,20 @@ export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const fetchUser = async () => {
+    const user = auth.currentUser; // Get the currently signed-in user directly from SDK
+    if (user) {
+      try {
+        const userDocRef = doc(db, "users", user.uid);
+        const userDocSnap = await getDoc(userDocRef);
+        if (userDocSnap.exists()) {
+          setUserData(userDocSnap.data());
+        }
+      } catch (error) {
+        console.error("Error refreshing user data:", error);
+      }
+    }
+  };
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
@@ -69,7 +83,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const value = { currentUser, userData, loading, logout, login, signup, signInWithGoogle };
+  const value = { currentUser, userData, loading, logout, login, signup, signInWithGoogle, fetchUser };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

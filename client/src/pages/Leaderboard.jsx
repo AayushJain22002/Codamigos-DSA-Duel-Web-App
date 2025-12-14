@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Badge } from "../../components/ui/badge.jsx";
 import { Card, CardContent, CardHeader } from "../../components/ui/card.jsx";
-import { collection, getDocs, limit, orderBy, query } from "firebase/firestore";
+import {doc, getDoc } from "firebase/firestore";
 import { useAuth } from "../lib/AuthProvider.jsx";
 import { db } from "../../firebase.js";
 import { RefreshCw } from "lucide-react";
@@ -16,35 +16,42 @@ const Leaderboard = () => {
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 6;
-
   const fetchTopPlayers = useCallback(async () => {
     setLoading(true);
     setError(null);
-    try {
-      const q = query(collection(db, "users"), orderBy("elo", "desc"), limit(20));
-      const snapshot = await getDocs(q);
 
-      if (snapshot.empty) {
+    try {
+      // 1. Reference the single metadata document
+      const metadataRef = doc(db, "system", "metadata");
+      const snapshot = await getDoc(metadataRef);
+
+      if (!snapshot.exists()) {
+        console.warn("Metadata not found, leaderboard might be empty.");
+        setDiscoverUsers([]);
         setCurrentPage(1);
         return;
       }
 
-      const users = snapshot.docs
-        .map((doc) => {
-          const data = doc.data();
-          const id = doc.id;
-          const avatar = data?.avatarUrl ?? null;
-          const username = data?.displayName || data?.userHandle || "Anonymous";
-          const handle = data?.userHandle || null;
-          const score = typeof data?.elo === "number" ? data.elo : 0;
-          return { id, avatar, username, handle, score };
-        })
-        .filter(Boolean);
+      const data = snapshot.data();
+      // 2. Get the pre-calculated leaderboard array
+      const rawLeaderboard = data.leaderboard || [];
+
+      // 3. Map it to your UI structure
+      // Note: 'leaderboard' contains up to 100 users. We slice(0, 20) to match your old limit(20).
+      const users = rawLeaderboard.slice(0, 20).map((entry) => {
+        return {
+          id: entry.uid,
+          avatar: entry.photoURL ?? null,
+          username: entry.username || "Anonymous",
+          handle: null, // The metadata script aggregates display name into 'username'
+          score: typeof entry.elo === "number" ? entry.elo : 0,
+        };
+      });
 
       setDiscoverUsers(users);
       setCurrentPage(1);
     } catch (e) {
-      console.error("Error fetching top players", e);
+      console.error("Error fetching top players from metadata", e);
       setError("Failed to load leaderboard — showing demo data.");
       setCurrentPage(1);
     } finally {
@@ -108,7 +115,7 @@ const Leaderboard = () => {
             className="px-3 py-2 rounded-md bg-white/6 hover:bg-white/10 transition text-sm"
             aria-label="Refresh leaderboard"
           >
-            <RefreshCw size={15} /> 
+            <RefreshCw size={15} />
           </button>
 
           <div className="text-sm text-neutral-300">

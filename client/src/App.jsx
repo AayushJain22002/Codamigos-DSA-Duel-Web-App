@@ -47,6 +47,8 @@ const App = () => {
               <Route path="auth" element={<LoginSignup />} />
               <Route path="profile" element={<Profile />} />
               <Route path="problems" element={<Problems />} />
+              <Route path="u/:handle" element={<Profile />} />              
+              <Route path=":handle" element={<Profile />} />
               <Route path="leaderboard" element={<Leaderboard />} />
             </Route>
             <Route path="myamigos" element={<MyAmigos />} />
@@ -54,6 +56,7 @@ const App = () => {
             <Route path="/room" element={<RoomPage />} />
             <Route path="/redeem/shop" element={<Shop />} />
             <Route path="*" element={<NotFound />} />
+            
           </Routes>
         </BrowserRouter>
         <Toaster position="bottom-right" reverseOrder={false} />

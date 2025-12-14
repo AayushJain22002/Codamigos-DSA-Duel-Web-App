@@ -81,9 +81,7 @@ const CodingArea = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [activeProblemId, setActiveProblemId] = useState(null);
     const [testResults, setTestResults] = useState([]);
-    const [casesOrResults, setCasesOrResults] = useState('cases'); // 'cases' | 'results'
-
-    // --- 1. room & chat listeners ---
+    const [casesOrResults, setCasesOrResults] = useState('cases');
     useEffect(() => {
         if (!currentUser || !code) return;
 
@@ -117,7 +115,6 @@ const CodingArea = () => {
         };
     }, [code, navigate, currentUser]);
 
-    // --- 2. fetch problems from Firestore once ---
     useEffect(() => {
         if (roomData?.problems && problemsData.length === 0) {
             const fetchProblems = async () => {
