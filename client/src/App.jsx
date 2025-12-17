@@ -16,6 +16,10 @@ import MyAmigos from "./pages/MyAmigos.jsx";
 import Leaderboard from "./pages/Leaderboard.jsx";
 import Problems from "./pages/Problems.jsx";
 import Shop from "./pages/Shop.jsx";
+import DonationPage from "./pages/services/DonationPage.jsx";
+import ServiceHome from "./pages/services/ServiceHome.jsx";
+import Pricing from "./pages/services/Pricing.jsx";
+import Feedback from "./pages/services/Feedback.jsx";
 
 const App = () => {
 
@@ -47,16 +51,22 @@ const App = () => {
               <Route path="auth" element={<LoginSignup />} />
               <Route path="profile" element={<Profile />} />
               <Route path="problems" element={<Problems />} />
-              <Route path="u/:handle" element={<Profile />} />              
+              <Route path="u/:handle" element={<Profile />} />
               <Route path=":handle" element={<Profile />} />
               <Route path="leaderboard" element={<Leaderboard />} />
+            </Route>
+            <Route path="/services" element={<MainLayout />}>
+              <Route index element={<ServiceHome />} />
+              <Route path="feedback" element={<Feedback />} />
+              <Route path="donate" element={<DonationPage />} />
+              <Route path="pricing" element={<Pricing />} />
             </Route>
             <Route path="myamigos" element={<MyAmigos />} />
             <Route path="/room/:code" element={<CodingArea />} />
             <Route path="/room" element={<RoomPage />} />
             <Route path="/redeem/shop" element={<Shop />} />
             <Route path="*" element={<NotFound />} />
-            
+
           </Routes>
         </BrowserRouter>
         <Toaster position="bottom-right" reverseOrder={false} />

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Heart, Coffee } from 'lucide-react'; // Added Coffee for donation icon (optional, or use Heart)
-import { FaGithub, FaLinkedin } from 'react-icons/fa';
+import { FaGithub, FaInstagram, FaLinkedin, FaReddit } from 'react-icons/fa';
 import { BsTwitterX } from "react-icons/bs";
 
 const Footer = () => {
@@ -22,9 +22,11 @@ const Footer = () => {
               The ultimate real-time arena for developers. Compete, rank up, and master algorithms together.
             </p>
             <div className="flex gap-4">
+              <SocialIcon icon={<FaInstagram size={20} />} href="https://instagram.com/codamigos" />
               <SocialIcon icon={<FaGithub  size={20} />} href="https://github.com/AkshatRaval/" />
               <SocialIcon icon={<BsTwitterX  size={20} />} href="https://x.com/AkshatRaval8" />
               <SocialIcon icon={<FaLinkedin  size={20} />} href="https://linkedin.com/in/akshatraval2486" />
+              <SocialIcon icon={<FaReddit  size={20} />} href="https://www.reddit.com/r/Codamigos/" />
             </div>
           </div>
 
@@ -43,14 +45,12 @@ const Footer = () => {
           <div>
             <h3 className="text-white font-semibold mb-4">Support</h3>
             <ul className="space-y-3 text-sm">
-              <FooterLink to="/support">Customer Care</FooterLink>
-              <FooterLink to="/suggestions">Suggestion Box</FooterLink>
-              <FooterLink to="/blog">Official Blog</FooterLink>
-              
+              <FooterLink to="/services/support">Customer Care</FooterLink>           
+              <FooterLink to="/services/feedback">Feedback/Suggestion</FooterLink>
               {/* Special Donation Link */}
               <li>
                 <Link 
-                  to="/donate" 
+                  to="/services/donate" 
                   className="flex items-center gap-2 text-yellow-500 hover:text-yellow-400 transition-colors duration-200 w-fit font-medium"
                 >
                   <span>Donate</span>

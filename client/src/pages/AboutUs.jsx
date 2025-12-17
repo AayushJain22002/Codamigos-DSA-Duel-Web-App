@@ -417,9 +417,9 @@ const AboutUs = () => {
 
               {/* The Image */}
               <img
-                src="https://cdn3d.iconscout.com/3d/premium/thumb/web-developer-3d-illustration-download-in-png-blend-fbx-gltf-file-formats--coding-programming-css-html-development-pack-business-illustrations-4433367.png"
+                src="/images/about2.png"
                 alt="Codamigos Developer"
-                className="relative w-full max-w-md drop-shadow-2xl grayscale-20% hover:grayscale-0 transition-all duration-500"
+                className="relative w-full right-10 max-w-md drop-shadow-2xl grayscale-20% hover:grayscale-0 transition-all duration-500"
               />
             </div>
           </div>
